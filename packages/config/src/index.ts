@@ -29,5 +29,6 @@ export function defineConfig(config: AriaConfig): AriaConfig {
   return config;
 }
 
-// PHASE 4: a cosmiconfig-based loader (search for aria.config.{ts,js,json}, .ariarc)
-// lands here. Phase 0 only needs the schema and defineConfig.
+export { resolveComponentSemantic } from './resolve';
+export { AriaConfigError, validateAriaConfig } from './validate';
+export { clearAriaConfigCache, loadAriaConfig, type LoadedAriaConfig } from './loader';

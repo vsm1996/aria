@@ -151,6 +151,23 @@ A rule moves from lint to format when config supplies ground truth for the detec
 The mechanism: `componentSemantics` in aria.config.ts changes `basis: inferred` to
 `basis: declared`, which the `emit` helper translates to an auto-applied `fix`.
 
+**Config bridge status: built and tested, not yet consumed by any rule.**
+`@aria/config` now ships the full mechanism: `loadAriaConfig(searchFrom)`
+(cosmiconfig, upward search to the filesystem root over
+`aria.config.{ts,js,cjs,json}` / `.ariarc(.json)`; "no config" is a
+first-class `null` result, a malformed or schema-invalid config throws
+`AriaConfigError` naming the file — never silently swallowed), the pure
+synchronous `resolveComponentSemantic(config, name)` that a future lint rule
+calls at lint time, and strict validation (unknown keys rejected loudly,
+`source` normalized to `'declared'` and never contradicted). Caching is
+per-process with per-directory search results plus a validation memo, so
+repeated loads return the same object and nothing hits the filesystem per
+node visit; `clearAriaConfigCache()` exists for tests and long-lived
+servers. The loader is the config package's single sanctioned I/O surface —
+rule logic receives a loaded config and calls only the pure resolver. No
+rule consumes this yet; wiring it into the first lint rule is deliberately a
+separate change.
+
 | rule | graduates when |
 |------|---------------|
 | `interactive-role-required` | component declared with an explicit `role` in config |
