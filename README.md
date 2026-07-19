@@ -32,13 +32,19 @@ lives in [CLAUDE.md](./CLAUDE.md).
 
 ## What exists today
 
-- **`eslint-plugin-aria-a11y`** with one format-tier rule implemented and
-  gated: **`no-redundant-role`** — removes an explicit `role` that duplicates
-  the element's implicit role (`<button role="button">` → `<button>`).
-  It resolves ancestor-dependent roles statically (`<li role="listitem">` is
-  redundant inside a visible `<ul>`, untouchable inside a `<div>` or across
-  any component/portal/dynamic boundary) and stays silent on anything
-  undecidable.
+- **`eslint-plugin-aria-a11y`** with two format-tier rules implemented and
+  gated:
+  - **`no-redundant-role`** — removes an explicit `role` that duplicates the
+    element's implicit role (`<button role="button">` → `<button>`). Resolves
+    ancestor-dependent roles statically (`<li role="listitem">` is redundant
+    inside a visible `<ul>`, untouchable inside a `<div>` or across any
+    component/portal/dynamic boundary) and stays silent on anything
+    undecidable.
+  - **`no-unsupported-aria`** — removes aria-* attributes WAI-ARIA doesn't
+    support on the element's resolved role (`<button aria-checked>` →
+    `<button>`), using the same full-confidence role resolution. Global ARIA
+    properties are never touched, and an unresolved role means every aria-*
+    on the element stays put.
 - **ESLint ↔ oxlint parity, enforced.** The same rule runs under oxlint's
   experimental `jsPlugins` with zero drift across every fixture — diagnostics,
   locations, and fix output — verified by `pnpm parity:oxlint` on every push
