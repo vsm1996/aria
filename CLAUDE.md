@@ -4,8 +4,9 @@ This file is read automatically by Claude Code on every run. Read it before
 writing or changing anything. When code and this file disagree, this file wins
 until you change it on purpose.
 
-The full philosophy, architecture, and milestone plan live in:
-`ARIA_IMPLEMENTATION_PLAN.md` (project root). Read that first on any new session.
+The full philosophy, architecture, and milestone plan live in the
+"Implementation Plan & Working Spec" section further down in THIS file.
+Read it in full on any new session. There is no separate plan file.
 
 ---
 
@@ -78,7 +79,7 @@ packages/eslint-plugin/   eslint-plugin-aria-a11y  PRIMARY deliverable
   src/util/emit.ts        gate-aware context.report wrapper
   src/rules/              one file + one test file per rule
 docs/rule-registry.md     source of truth for every rule's status
-ARIA_IMPLEMENTATION_PLAN.md  full philosophy + architecture
+CLAUDE.md                 this file: working agreement + full plan/architecture
 ```
 
 ---

@@ -2,7 +2,7 @@
  * Declared semantics for one design-system component. Supplying this is how a
  * design system hands Aria ground truth instead of a guess, which is what lets
  * the matching diagnostics graduate from the lint tier to the format tier
- * (see ARIA_IMPLEMENTATION_PLAN.md, sections 2 and 6 — "the Renge bridge").
+ * (see CLAUDE.md, Implementation Plan §2 and §6 — "the Renge bridge").
  */
 export interface ComponentSemantic {
   /** The ARIA role this component renders as. */

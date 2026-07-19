@@ -7,7 +7,7 @@
  *  - `inferred` : a guess the engine made from signals (onClick, class names, context).
  *
  * This is the single most important type in the system. The central invariant
- * (see ARIA_IMPLEMENTATION_PLAN.md, section 2) is expressed entirely in terms of it.
+ * (see CLAUDE.md, Implementation Plan §2) is expressed entirely in terms of it.
  */
 export type SemanticSource = 'native' | 'declared' | 'inferred';
 
