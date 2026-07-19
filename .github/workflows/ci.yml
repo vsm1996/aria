@@ -1,0 +1,41 @@
+# The project's own `--check` gate. Aria's spine is "a check in a pipeline
+# beats good intentions" — that applies to our invariants first. All three
+# steps are blocking: typecheck, the full test suite (which includes the tier
+# gate property tests), and ESLint↔oxlint parity (the portability guarantee).
+#
+# To make these actually block merges, mark the `check` job as a required
+# status check in the repository's branch protection settings once the repo
+# is on GitHub — the workflow alone fails the run, branch protection is what
+# refuses the merge.
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # Reads the pinned version from package.json's `packageManager` field.
+      - uses: pnpm/action-setup@v4
+
+      # Node >= 23.6 required: scripts/oxlint-parity.mjs imports the shared
+      # fixtures module (.ts) directly via native type stripping.
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      - run: pnpm typecheck
+
+      - run: pnpm test
+
+      # Builds the plugin itself (oxlint loads dist/), then diffs every
+      # fixture across ESLint and oxlint. Exits nonzero on any drift.
+      - run: pnpm parity:oxlint

@@ -1,0 +1,25 @@
+{
+  "name": "aria-a11y-monorepo",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "packageManager": "pnpm@11.5.2",
+  "workspaces": [
+    "packages/*"
+  ],
+  "scripts": {
+    "test": "vitest run --reporter verbose",
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "parity:oxlint": "pnpm --filter eslint-plugin-aria-a11y build && node scripts/oxlint-parity.mjs"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "@vitest/coverage-v8": "^3.0.0",
+    "aria-query": "^5.3.2",
+    "eslint": "^9.13.0",
+    "oxlint": "^1.74.0",
+    "tsup": "^8.3.0",
+    "typescript": "^5.6.3",
+    "vitest": "^3.0.0"
+  }
+}

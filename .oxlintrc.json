@@ -1,0 +1,17 @@
+{
+  // oxlint host config: loads eslint-plugin-aria-a11y via the experimental
+  // jsPlugins API (Phase 1 acceptance — see ARIA_IMPLEMENTATION_PLAN.md §5).
+  // Built output, not src: oxlint's plugin runtime is plain Node and cannot
+  // resolve the extensionless TS imports. Run `pnpm --filter
+  // eslint-plugin-aria-a11y build` first, or use `pnpm parity:oxlint`.
+  "$schema": "./node_modules/oxlint/configuration_schema.json",
+  "jsPlugins": ["./packages/eslint-plugin/dist/index.js"],
+  // Default oxc categories off so the parity harness (scripts/oxlint-parity.mjs)
+  // compares Aria diagnostics only, host to host.
+  "categories": {
+    "correctness": "off"
+  },
+  "rules": {
+    "aria-a11y/no-redundant-role": "error"
+  }
+}
