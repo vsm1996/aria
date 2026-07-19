@@ -15,10 +15,10 @@ export interface JSXIdentifier {
 
 export interface JSXAttributeNode {
   type: 'JSXAttribute';
-  name: { type: 'JSXIdentifier' | 'JSXNamespacedName'; name?: string };
+  name: { type: 'JSXIdentifier' | 'JSXNamespacedName'; name?: string; range: [number, number] };
   value:
-    | { type: 'Literal'; value: unknown }
-    | { type: string }
+    | { type: 'Literal'; value: unknown; range: [number, number] }
+    | { type: string; range: [number, number] }
     | null;
   range: [number, number];
 }

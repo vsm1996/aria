@@ -20,7 +20,7 @@ These are auto-applied on save / `--fix`. They never add asserted values.
 |----|--------|-------|---------------|
 | `no-redundant-role` | SHIPPED | native | WAI-ARIA 1.2 §6.3 — "Authors MUST NOT use an explicit role that is the same as the element's implicit ARIA role." |
 | `no-unsupported-aria` | SHIPPED | native | ARIA in HTML §2.4 / WAI-ARIA 1.2 §6.5 — ARIA attributes not in the allowed set for a role SHOULD be ignored. Removing them makes source honest. |
-| `aria-syntax-normalize` | CANDIDATE | native | WAI-ARIA 1.2 §6.1 — role and state/property values are case-insensitive tokens; normalizing to lowercase is lossless. |
+| `aria-syntax-normalize` | SHIPPED | native | WAI-ARIA 1.2 §6.1 — ARIA attribute names and state/property token values are processed case-insensitively; lowercase is canonical and lossless. |
 
 ### `no-redundant-role` — ancestor-dependent implicit roles
 
@@ -73,6 +73,34 @@ Deliberate calls, each on the never-strip-on-doubt side:
 - **Fail-safe on data shape:** if a future aria-query stops modeling
   `roletype`, the rule disables itself rather than run with a shrunken
   global list.
+
+### `aria-syntax-normalize` — scope decisions
+
+The rule ONLY changes character case, and its test suite asserts exactly
+that as a property: every fix output equals its input under case folding,
+and the converged output is silent (idempotence). What it normalizes:
+attribute name casing (`aria-Label` → `aria-label`, when the lowercase name
+is a real ARIA attribute) and enumerated value casing for boolean / tristate
+/ single-token types per aria-query (`aria-hidden="True"` → `"true"`,
+`aria-current="Page"` → `"page"`). Deliberate exclusions:
+
+- **Attribute ordering — dropped from scope entirely.** In JSX, attribute
+  order is program semantics whenever a spread is present (`{...p}` before
+  vs. after a literal attribute changes which value wins), so reordering is
+  not meaning-preserving in general; without a spread it is semantically
+  inert diff churn with zero accessibility value. Not built.
+- **`role` value casing.** Role token matching is case-sensitive in
+  practice: `role="BUTTON"` matches no role and is ignored, so normalizing
+  it would newly apply the role — a tree change, not a normalization.
+- **Components.** `aria-Hidden="True"` on a component is a JS prop name and
+  value; rewriting either changes what the component receives.
+- **Rename guards.** Name casing fixes are skipped when a spread is present
+  (pre-DOM, `aria-Label` and `aria-label` are different JS keys, so the
+  rename could change which wins) or when the canonical name already exists
+  (rename would create a duplicate).
+- **tokenlist values** (`aria-relevant`) hold multiple tokens; multi-token
+  normalization is out of scope. Unknown values (`aria-hidden="yes"`) and
+  unrecognized names (`aria-lable`) are signals to the human, untouched.
 
 ### Host parity
 
