@@ -32,7 +32,7 @@ lives in [CLAUDE.md](./CLAUDE.md).
 
 ## What exists today
 
-- **`eslint-plugin-aria-a11y`** with two format-tier rules implemented and
+- **`eslint-plugin-aria-a11y`** with the full format tier implemented and
   gated:
   - **`no-redundant-role`** — removes an explicit `role` that duplicates the
     element's implicit role (`<button role="button">` → `<button>`). Resolves
@@ -45,6 +45,10 @@ lives in [CLAUDE.md](./CLAUDE.md).
     `<button>`), using the same full-confidence role resolution. Global ARIA
     properties are never touched, and an unresolved role means every aria-*
     on the element stays put.
+  - **`aria-syntax-normalize`** — canonical lowercase for ARIA attribute
+    names (`aria-Label` → `aria-label`) and enumerated values
+    (`aria-hidden="True"` → `"true"`). Only ever changes character case —
+    tested as a property, not a promise.
 - **ESLint ↔ oxlint parity, enforced.** The same rule runs under oxlint's
   experimental `jsPlugins` with zero drift across every fixture — diagnostics,
   locations, and fix output — verified by `pnpm parity:oxlint` on every push

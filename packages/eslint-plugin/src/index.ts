@@ -1,4 +1,5 @@
 import type { ESLint } from 'eslint';
+import ariaSyntaxNormalize from './rules/aria-syntax-normalize';
 import noRedundantRole from './rules/no-redundant-role';
 import noUnsupportedAria from './rules/no-unsupported-aria';
 
@@ -8,6 +9,7 @@ const plugin: ESLint.Plugin = {
     version: '0.0.0',
   },
   rules: {
+    'aria-syntax-normalize': ariaSyntaxNormalize,
     'no-redundant-role': noRedundantRole,
     'no-unsupported-aria': noUnsupportedAria,
   },
@@ -18,6 +20,7 @@ const plugin: ESLint.Plugin = {
 (plugin.configs as Record<string, ESLint.ConfigData>)['recommended'] = {
   plugins: ['aria-a11y'],
   rules: {
+    'aria-a11y/aria-syntax-normalize': 'error',
     'aria-a11y/no-redundant-role': 'error',
     'aria-a11y/no-unsupported-aria': 'error',
   },
