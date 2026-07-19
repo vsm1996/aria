@@ -19,7 +19,7 @@ These are auto-applied on save / `--fix`. They never add asserted values.
 | id | status | basis | spec citation |
 |----|--------|-------|---------------|
 | `no-redundant-role` | SHIPPED | native | WAI-ARIA 1.2 §6.3 — "Authors MUST NOT use an explicit role that is the same as the element's implicit ARIA role." |
-| `no-unsupported-aria` | CANDIDATE | native | ARIA in HTML §2.4 — ARIA attributes not in the allowed set for a role SHOULD be ignored. Removing them makes source honest. |
+| `no-unsupported-aria` | SHIPPED | native | ARIA in HTML §2.4 / WAI-ARIA 1.2 §6.5 — ARIA attributes not in the allowed set for a role SHOULD be ignored. Removing them makes source honest. |
 | `aria-syntax-normalize` | CANDIDATE | native | WAI-ARIA 1.2 §6.1 — role and state/property values are case-insensitive tokens; normalizing to lowercase is lossless. |
 
 ### `no-redundant-role` — ancestor-dependent implicit roles
@@ -45,13 +45,53 @@ makes them decidable and stays silent everywhere else:
 Fixtures pinning every case: `no-redundant-role.fixtures.ts` (shared by the
 RuleTester suite and the oxlint parity harness).
 
+### `no-unsupported-aria` — classification calls
+
+The rule strips an aria-* attribute only when the element's role resolved
+with full confidence (shared resolver with `no-redundant-role`: explicit
+literal role recognized by aria-query wins; otherwise the implicit role with
+all its undecidable → silent discipline; dynamic/spread roles, multi-token
+fallback lists, unrecognized or abstract explicit roles are all silence).
+Deliberate calls, each on the never-strip-on-doubt side:
+
+- **Globals are exempt everywhere, defined as a union.** Base set: aria-query's
+  own global list (the `props` of the abstract base role `roletype`). Extended
+  with `aria-disabled`, `aria-invalid`, `aria-errormessage`, `aria-haspopup`:
+  ARIA 1.2 narrowed these from global (1.1) to role-specific, aria-query
+  follows 1.2, but browsers still map them broadly — a debatable
+  reclassification is not enforced by deletion.
+- **Spec-prohibited globals are still not stripped.** `generic` prohibits
+  `aria-label`/`aria-labelledby` (aria-query `prohibitedProps`), but browsers
+  may still compute a name from them; removal could change the tree. The
+  prohibition is a flag-worthy fact for a future lint rule, not a format fix.
+- **Unrecognized aria-* names are skipped** (`aria-lable=`…). A typo is a
+  signal to the human; deleting it hides the bug. Candidate for a lint rule
+  that suggests the nearest real attribute.
+- **Role-based check only.** aria-query has no per-element attribute tables
+  (ARIA in HTML's element-level constraints), so the check is strictly
+  role-level. Element-level tightening would need a second data source.
+- **Fail-safe on data shape:** if a future aria-query stops modeling
+  `roletype`, the rule disables itself rather than run with a shrunken
+  global list.
+
 ### Host parity
 
-Phase 1 acceptance ("identical output under oxlint's `jsPlugins`") is verified
-by `pnpm parity:oxlint` (`scripts/oxlint-parity.mjs`): every fixture runs
-through ESLint and oxlint (v1.74.0, `jsPlugins` via `.oxlintrc.json`) and the
-harness diffs diagnostic count, message, line:col, and `--fix` output —
-currently zero drift. Parity is a blocking CI gate (`.github/workflows/ci.yml`
+Parity ("identical output under oxlint's `jsPlugins`") is verified by
+`pnpm parity:oxlint` (`scripts/oxlint-parity.mjs`): every fixture module
+(`src/rules/*.fixtures.ts`, discovered automatically — new rules are picked
+up without touching the harness) runs through ESLint and oxlint (v1.74.0,
+`jsPlugins` via `.oxlintrc.json`) with all plugin rules enabled, and the
+harness diffs diagnostic count, message, line:col, and converged `--fix`
+output — currently zero drift across every rule.
+
+One measured host difference, by design not a drift: both hosts use the same
+single-pass fixer rule (a fix starting exactly where a previous one ended is
+deferred), but `eslint --fix` loops internally up to 10 passes while oxlint
+applies one pass per invocation. Adjacent discrete removals (two unsupported
+aria-* side by side) therefore converge in one ESLint run vs. two oxlint
+runs — same fixes, same final output. The harness compares converged output;
+fixtures document the one-pass state in `output` and the final form in
+`converged`. Parity is a blocking CI gate (`.github/workflows/ci.yml`
 runs `typecheck`, `test`, and `parity:oxlint` on push to main and on every
 PR), not a command someone has to remember. Caveats: `jsPlugins` is still
 experimental upstream, and

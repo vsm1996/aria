@@ -12,6 +12,7 @@
     "correctness": "off"
   },
   "rules": {
-    "aria-a11y/no-redundant-role": "error"
+    "aria-a11y/no-redundant-role": "error",
+    "aria-a11y/no-unsupported-aria": "error"
   }
 }

@@ -1,5 +1,6 @@
 import type { ESLint } from 'eslint';
 import noRedundantRole from './rules/no-redundant-role';
+import noUnsupportedAria from './rules/no-unsupported-aria';
 
 const plugin: ESLint.Plugin = {
   meta: {
@@ -8,6 +9,7 @@ const plugin: ESLint.Plugin = {
   },
   rules: {
     'no-redundant-role': noRedundantRole,
+    'no-unsupported-aria': noUnsupportedAria,
   },
   configs: {},
 };
@@ -17,6 +19,7 @@ const plugin: ESLint.Plugin = {
   plugins: ['aria-a11y'],
   rules: {
     'aria-a11y/no-redundant-role': 'error',
+    'aria-a11y/no-unsupported-aria': 'error',
   },
 };
 
