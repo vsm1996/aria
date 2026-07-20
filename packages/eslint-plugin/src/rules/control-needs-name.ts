@@ -9,6 +9,7 @@ import {
   getAttrState,
   hasSpreadAttribute,
   intrinsicTag,
+  isAriaHidden,
   type JSXOpeningElementNode,
 } from '../util/resolve-role';
 
@@ -247,6 +248,15 @@ export const controlNeedsName: Rule.RuleModule = {
 
         // A spread could carry any name signal we cannot see — never flag.
         if (hasSpread) return;
+
+        // aria-hidden removes the element from the accessibility tree, so it
+        // needs no accessible name (same exemption as img-needs-alt, via the
+        // shared isAriaHidden). Note: this is independent of
+        // aria-hidden-not-focusable — an aria-hidden *focusable* control is
+        // still that rule's concern; both rules fire independently. The id /
+        // label targets above were already collected, so hidden elements can
+        // still resolve OTHER controls' references.
+        if (isAriaHidden(node, hasSpread)) return;
 
         if (tag !== null) {
           const kind = controlKind(node, tag);

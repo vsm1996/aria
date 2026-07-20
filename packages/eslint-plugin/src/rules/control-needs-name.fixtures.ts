@@ -61,6 +61,13 @@ export const valid: string[] = [
   // Not a control.
   '<div>caption</div>',
 
+  // aria-hidden removes the control from the accessibility tree → it needs no
+  // name (BUG 2 fix). The real MUI shape: an aria-hidden shadow field. It is
+  // also tabIndex="-1", so aria-hidden-not-focusable is silent too, keeping
+  // this parity-clean — but control-needs-name's exemption is independent of
+  // focus (see the rule's own test for the focusable-aria-hidden case).
+  '<textarea aria-hidden tabIndex={-1} />',
+
   // ---- Config bridge: declared control components. ----
   '<IconButton label="Close" />', // declared name prop present
   '<IconButton aria-label="Close" />', // named via ARIA on the usage
