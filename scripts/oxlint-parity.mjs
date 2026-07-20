@@ -34,9 +34,11 @@ const fixtureModules = readdirSync(rulesDir)
 if (fixtureModules.length === 0) throw new Error('no fixture modules found');
 
 const fixtures = [];
+const perRuleOptions = new Map();
 for (const file of fixtureModules) {
   const ruleName = file.replace(/\.fixtures\.ts$/, '');
-  const { valid, invalid } = await import(path.join(rulesDir, file));
+  const { valid, invalid, ruleOptions } = await import(path.join(rulesDir, file));
+  if (ruleOptions !== undefined) perRuleOptions.set(ruleName, ruleOptions);
   for (const code of valid) {
     fixtures.push({ ruleName, code, expectedOutput: code, expectedErrors: 0 });
   }
@@ -44,7 +46,9 @@ for (const file of fixtureModules) {
     fixtures.push({
       ruleName,
       code: f.code,
-      expectedOutput: f.converged ?? f.output,
+      // output: null means "suggestion only, no autofix" — expect the code
+      // back byte-identical from --fix on BOTH hosts. That IS the gate.
+      expectedOutput: f.converged ?? f.output ?? f.code,
       expectedErrors: f.errors.length,
     });
   }
@@ -53,13 +57,38 @@ for (const file of fixtureModules) {
 // ---- ESLint side -----------------------------------------------------------
 
 const linter = new Linter();
+const ruleEntry = (rule) => {
+  const options = perRuleOptions.get(rule);
+  return options !== undefined ? ['error', ...options] : 'error';
+};
 const eslintConfig = {
   plugins: { 'aria-a11y': plugin },
   rules: Object.fromEntries(
-    Object.keys(plugin.rules).map((rule) => [`aria-a11y/${rule}`, 'error']),
+    Object.keys(plugin.rules).map((rule) => [`aria-a11y/${rule}`, ruleEntry(rule)]),
   ),
   languageOptions: { ecmaVersion: 2022, parserOptions: { ecmaFeatures: { jsx: true } } },
 };
+
+// Both hosts must run identical rule options: verify .oxlintrc.json carries
+// each fixture module's ruleOptions verbatim, so graduation behavior is
+// compared host-to-host rather than silently diverging.
+{
+  const rawOxlintrc = readFileSync(path.join(root, '.oxlintrc.json'), 'utf8')
+    .split('\n')
+    .filter((line) => !line.trimStart().startsWith('//'))
+    .join('\n');
+  const oxlintrc = JSON.parse(rawOxlintrc);
+  for (const [rule, options] of perRuleOptions) {
+    const entry = oxlintrc.rules?.[`aria-a11y/${rule}`];
+    const entryOptions = Array.isArray(entry) ? entry.slice(1) : [];
+    if (JSON.stringify(entryOptions) !== JSON.stringify(options)) {
+      throw new Error(
+        `.oxlintrc.json options for aria-a11y/${rule} do not match the fixture module's ruleOptions — ` +
+          `fixtures: ${JSON.stringify(options)}, oxlintrc: ${JSON.stringify(entryOptions)}`,
+      );
+    }
+  }
+}
 
 function runESLint(code) {
   const messages = linter

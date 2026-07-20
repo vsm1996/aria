@@ -13,6 +13,14 @@
   },
   "rules": {
     "aria-a11y/aria-syntax-normalize": "error",
+    // interactive-role-required's options MUST mirror `ruleOptions` in its
+    // fixtures module — the parity harness verifies this and fails on drift.
+    // The DeclaredButton entry exists to exercise the config bridge
+    // (inferred suggestion vs. declared auto-fix) identically in both hosts.
+    "aria-a11y/interactive-role-required": [
+      "error",
+      { "componentSemantics": { "DeclaredButton": { "role": "button", "source": "declared" } } }
+    ],
     "aria-a11y/no-redundant-role": "error",
     "aria-a11y/no-unsupported-aria": "error"
   }

@@ -49,6 +49,14 @@ lives in [CLAUDE.md](./CLAUDE.md).
     names (`aria-Label` → `aria-label`) and enumerated values
     (`aria-hidden="True"` → `"true"`). Only ever changes character case —
     tested as a property, not a promise.
+- **The first lint-tier rule, with the config bridge live**:
+  **`interactive-role-required`** flags a generic element (div, span) with a
+  click handler and no role — a suggestion of `role="button"` that is never
+  auto-applied. Declare a component's semantics in `aria.config.ts`
+  (`componentSemantics: { IconButton: { role: 'button' } }`) and the same
+  diagnostic on that component graduates: basis `declared`, real auto-fix.
+  That inferred-suggestion vs. declared-autofix contrast is a named test,
+  and both behaviors are verified identical under ESLint and oxlint.
 - **ESLint ↔ oxlint parity, enforced.** The same rule runs under oxlint's
   experimental `jsPlugins` with zero drift across every fixture — diagnostics,
   locations, and fix output — verified by `pnpm parity:oxlint` on every push
