@@ -1,5 +1,6 @@
 import type { ESLint } from 'eslint';
 import ariaSyntaxNormalize from './rules/aria-syntax-normalize';
+import idrefResolves from './rules/idref-resolves';
 import interactiveRoleRequired from './rules/interactive-role-required';
 import noRedundantRole from './rules/no-redundant-role';
 import noUnsupportedAria from './rules/no-unsupported-aria';
@@ -11,6 +12,7 @@ const plugin: ESLint.Plugin = {
   },
   rules: {
     'aria-syntax-normalize': ariaSyntaxNormalize,
+    'idref-resolves': idrefResolves,
     'interactive-role-required': interactiveRoleRequired,
     'no-redundant-role': noRedundantRole,
     'no-unsupported-aria': noUnsupportedAria,
@@ -24,6 +26,7 @@ const plugin: ESLint.Plugin = {
   plugins: ['aria-a11y'],
   rules: {
     'aria-a11y/aria-syntax-normalize': 'error',
+    'aria-a11y/idref-resolves': 'warn',
     'aria-a11y/interactive-role-required': 'warn',
     'aria-a11y/no-redundant-role': 'error',
     'aria-a11y/no-unsupported-aria': 'error',

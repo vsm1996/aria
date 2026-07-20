@@ -128,16 +128,20 @@ cannot resolve TS source imports — the harness rebuilds before running.
 
 ---
 
-## Lint-tier rules (basis: inferred)
+## Lint-tier rules (mostly inferred; see `idref-resolves` for native)
 
-These surface as located errors + suggested fixes. Never auto-applied. Humans approve.
+These surface as located diagnostics, human-reviewed, never auto-applied. Most
+carry `inferred` basis. `idref-resolves` is the exception: a `native` fact
+that is still lint-tier because there is no single safe repair and its finding
+is advisory, not conclusive — the basis and the tier deliberately diverge (see
+its section below).
 
 | id | status | basis | confidence band | spec citation |
 |----|--------|-------|-----------------|---------------|
 | `interactive-role-required` | SHIPPED | inferred → declared via config | intrinsic: child-inspected suggestion / report-only / silent · declared: auto-fix | WCAG 2.1 SC 4.1.2 — UI components must have a role. Non-semantic elements with event handlers need one. |
 | `control-needs-name` | CANDIDATE | inferred | 70–99% | WCAG 2.1 SC 4.1.2 — UI components must have an accessible name. Cannot author the name text — flagging only. |
 | `img-needs-alt` | CANDIDATE | native* | 100% | WCAG 2.1 SC 1.1.1 — All non-decorative images need alt text. Cannot author the text — flagging only. |
-| `idref-resolves` | CANDIDATE | native | 100% (in-file) | WAI-ARIA 1.2 §7 — aria-labelledby/describedby/controls MUST reference a valid id. In-file check only. |
+| `idref-resolves` | SHIPPED | native (report-only) | 100% (in-file) | WAI-ARIA 1.2 §7 — aria-labelledby/describedby/controls MUST reference a valid id. In-file check only. |
 | `aria-hidden-not-focusable` | CANDIDATE | native | 100% | WAI-ARIA 1.2 §6.6 — aria-hidden=true MUST NOT be applied to a focusable element. Fix is ambiguous → lint. |
 
 *`img-needs-alt` has native basis for the detection (the img tag is known), but
@@ -229,9 +233,60 @@ searching upward from the linted file. The named test
 gate-misuse test showing an inferred-basis fix structurally cannot emit as
 a host auto-fix.
 
----
+### `idref-resolves` — a native fact in the lint tier
 
-## Graduation queue (lint → format on declared basis)
+Flags `aria-labelledby` / `aria-describedby` / `aria-controls` references
+(each a space-separated id list) to an id not present in the file. All three
+attributes are checked; each unresolved id in a list is its own diagnostic.
+
+**Basis/tier — the first rule where they deliberately diverge.** Whether a
+literal reference resolves against the file's literal `id`s is a *fact* read
+straight off the source, so the detection basis is `native` — not a guess,
+and the message states it plainly. But the rule sits in the **lint tier,
+report-only, `warn` by default**, decoupled from the `format` that
+`tierForBasis('native')` would return, for two reasons:
+
+1. **No single safe repair exists.** A broken reference could be fixed by
+   deleting it, correcting a typo, or adding the missing id to some element —
+   the rule cannot know which, so it never auto-fixes. "Missing id is a fact;
+   the correct fix is not."
+2. **"Not found in this file" is not conclusively a bug.** Ids are resolved
+   in the rendered DOM, which can compose elements from other files or inject
+   ids at runtime. A legitimate cross-file reference must not fail CI — that
+   would be a false positive on correct code, the one thing the format tier
+   may never do. So this is advisory: a `warn` a human confirms. (Nothing
+   enforces `tier === tierForBasis(basis)`; this rule departs from that
+   convention consciously, as the plan foresaw by listing it as `native` in
+   the lint tier. A team confident in its in-file id discipline can raise it
+   to `error` in their own config; the rule reports regardless of severity.)
+
+**Scope and the literal-only discipline:**
+
+- **In-file, whole-file.** Ids are global to the DOM, so a reference resolves
+  against any literal `id` anywhere in the file, not just siblings/ancestors;
+  forward references (target after the reference in source order) resolve too.
+  Resolution runs on `Program:exit`, after the whole file is collected.
+- **Literal-to-literal only.** A dynamic reference (`aria-labelledby={id}`) is
+  never checked. `id={'x'}` (a string-literal expression) counts as literal.
+- **Case-sensitive**, like `getElementById`: `aria-labelledby="Foo"` does not
+  resolve to `id="foo"` — a real non-resolution, reported.
+- **A dynamic id anywhere suppresses ALL unresolved-reference reports for the
+  file.** A `id={computed}` could evaluate to any referenced string at
+  runtime, so no literal reference can be *proven* absent. Fail-safe: stay
+  silent. This honors the "id exists only as a dynamic value → silent" case,
+  at the cost of false negatives in files mixing a broken ref with a dynamic
+  id — an acceptable trade (a missed warning, never a wrong one).
+
+**Near-match auto-fix exception — deliberately skipped in v1.** The plan
+allows a format-tier auto-fix "when the correct target is unique and present"
+(e.g. a case-only typo where exactly one id in the file matches
+case-insensitively). It is not built: report-only surfaces the problem and
+the casing fix is trivial for a human, while the safe bar is narrow and the
+token-level surgery within a multi-id value adds complexity disproportionate
+to a first version. The door is left open at a *high* bar for later — exact
+case-insensitive match with exactly one candidate id, correcting the
+*reference* token to match an existing element (never inventing an id, never
+Levenshtein guessing). No fuzzy matching.
 
 A rule moves from lint to format when config supplies ground truth for the detection.
 The mechanism: `componentSemantics` in aria.config.ts changes `basis: inferred` to

@@ -13,6 +13,7 @@
   },
   "rules": {
     "aria-a11y/aria-syntax-normalize": "error",
+    "aria-a11y/idref-resolves": "error",
     // interactive-role-required's options MUST mirror `ruleOptions` in its
     // fixtures module — the parity harness verifies this and fails on drift.
     // The DeclaredButton entry exists to exercise the config bridge

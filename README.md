@@ -62,6 +62,15 @@ lives in [CLAUDE.md](./CLAUDE.md).
   in `aria.config.ts` (`componentSemantics: { IconButton: { role: 'button' } }`)
   and it graduates: basis `declared`, and now a real auto-fix inserting the
   role. That inferred-vs-declared contrast is a named end-to-end test.
+- **`idref-resolves`** flags `aria-labelledby` / `aria-describedby` /
+  `aria-controls` references to an id that doesn't exist anywhere in the file
+  (each id in a space-separated list checked independently). It's the first
+  rule where basis and tier deliberately diverge: the detection is a `native`
+  fact (the id is or isn't there), but it's report-only and advisory rather
+  than a CI-gating error, because there's no single safe repair and a
+  reference can legitimately point across files. Literal-to-literal only —
+  dynamic ids and references are left alone, and a dynamic id anywhere makes
+  the whole file fail-safe silent.
 - **ESLint ↔ oxlint parity, enforced.** The same rule runs under oxlint's
   experimental `jsPlugins` with zero drift across every fixture — diagnostics,
   locations, and fix output — verified by `pnpm parity:oxlint` on every push
