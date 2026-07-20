@@ -71,6 +71,14 @@ lives in [CLAUDE.md](./CLAUDE.md).
   reference can legitimately point across files. Literal-to-literal only —
   dynamic ids and references are left alone, and a dynamic id anywhere makes
   the whole file fail-safe silent.
+- **`img-needs-alt`** flags an `<img>` exposed as an image with no accessible
+  name and no decorative signal (WCAG 1.1.1). `alt=""`, `role="presentation"`,
+  `aria-label`, `aria-labelledby`, and `aria-hidden` all legitimately silence
+  it — the point is presence of *some* valid encoding, not the word "alt".
+  Report-only, `native` basis: the missing name is a fact, but Aria won't
+  invent the alt text (a hard non-goal), so it flags and leaves the words to a
+  human. Also native-basis-but-lint-tier, like `idref-resolves`, but because
+  it's unfixable-by-machine rather than uncertain.
 - **ESLint ↔ oxlint parity, enforced.** The same rule runs under oxlint's
   experimental `jsPlugins` with zero drift across every fixture — diagnostics,
   locations, and fix output — verified by `pnpm parity:oxlint` on every push

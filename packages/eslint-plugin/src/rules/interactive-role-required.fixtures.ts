@@ -212,7 +212,7 @@ export const invalid: InvalidFixture[] = [
 
   // Case 4: card-like mix of children, no single-action signal.
   {
-    code: '<div onClick={handleClick}><img src="a.png" /><span>Title</span></div>',
+    code: '<div onClick={handleClick}><img src="a.png" alt="" /><span>Title</span></div>',
     errors: [{ messageId: 'missingRole', data: { element: 'div' } }],
     output: null,
   },
@@ -232,7 +232,7 @@ export const invalid: InvalidFixture[] = [
   // Boundary: more than one element child alongside the text — not the single
   // icon + label shape. Report-only.
   {
-    code: '<div onClick={handleClick}><svg /><img src="a.png" />Save</div>',
+    code: '<div onClick={handleClick}><svg /><img src="a.png" alt="" />Save</div>',
     errors: [{ messageId: 'missingRole', data: { element: 'div' } }],
     output: null,
   },
