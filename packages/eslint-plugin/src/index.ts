@@ -1,4 +1,5 @@
 import type { ESLint } from 'eslint';
+import ariaHiddenNotFocusable from './rules/aria-hidden-not-focusable';
 import ariaSyntaxNormalize from './rules/aria-syntax-normalize';
 import controlNeedsName from './rules/control-needs-name';
 import idrefResolves from './rules/idref-resolves';
@@ -13,6 +14,7 @@ const plugin: ESLint.Plugin = {
     version: '0.0.0',
   },
   rules: {
+    'aria-hidden-not-focusable': ariaHiddenNotFocusable,
     'aria-syntax-normalize': ariaSyntaxNormalize,
     'control-needs-name': controlNeedsName,
     'idref-resolves': idrefResolves,
@@ -29,6 +31,7 @@ const plugin: ESLint.Plugin = {
 (plugin.configs as Record<string, ESLint.ConfigData>)['recommended'] = {
   plugins: ['aria-a11y'],
   rules: {
+    'aria-a11y/aria-hidden-not-focusable': 'warn',
     'aria-a11y/aria-syntax-normalize': 'error',
     'aria-a11y/control-needs-name': 'warn',
     'aria-a11y/idref-resolves': 'warn',

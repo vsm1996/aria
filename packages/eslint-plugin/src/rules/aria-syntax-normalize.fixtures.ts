@@ -28,8 +28,9 @@ export const valid: string[] = [
   '<div aria-label="TRUE">x</div>',
 
   // Dynamic values and boolean shorthand are not literal strings. Untouched.
-  '<button aria-hidden={hidden}>x</button>',
-  '<button aria-hidden>x</button>',
+  // (Non-focusable elements, so aria-hidden-not-focusable stays silent too.)
+  '<div aria-hidden={hidden}>x</div>',
+  '<div aria-hidden>x</div>',
 
   // Already canonical.
   '<div aria-current="page">x</div>',

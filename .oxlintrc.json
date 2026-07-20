@@ -12,6 +12,7 @@
     "correctness": "off"
   },
   "rules": {
+    "aria-a11y/aria-hidden-not-focusable": "error",
     "aria-a11y/aria-syntax-normalize": "error",
     "aria-a11y/control-needs-name": [
       "error",
