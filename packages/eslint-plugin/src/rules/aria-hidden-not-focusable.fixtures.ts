@@ -29,6 +29,16 @@ export const valid: string[] = [
   // Descendant correctly de-focused inside the hidden subtree.
   '<div aria-hidden="true"><button tabindex="-1" aria-label="x">i</button></div>',
 
+  // REGRESSION (Phase 5 BUG 1): JSX uses camelCase `tabIndex`. The rule must
+  // recognize it, so the standard aria-hidden + tabIndex="-1" de-focus pattern
+  // is NOT flagged. (It used to false-positive because only lowercase
+  // `tabindex` was read.)
+  '<button aria-hidden="true" tabIndex="-1" aria-label="x">i</button>',
+  '<div aria-hidden="true"><button tabIndex="-1" aria-label="x">i</button></div>',
+  // The real MUI shape: `tabIndex={-1}` is an expression → undecidable → silent
+  // (before the fix, tabIndex was ignored and the textarea read as focusable).
+  '<textarea aria-hidden tabIndex={-1} aria-label="x" />',
+
   // aria-hidden is dynamic → cannot confirm it is "true" → silent.
   '<div aria-hidden={cond}><button aria-label="x">i</button></div>',
   '<button aria-hidden={cond} aria-label="x">i</button>',
@@ -56,6 +66,12 @@ export const invalid: InvalidFixture[] = [
   // An otherwise non-focusable element made focusable with tabindex >= 0.
   {
     code: '<div aria-hidden="true" tabindex="0">x</div>',
+    errors: [{ messageId: 'focusableHidden', data: { element: 'div' } }],
+    output: null,
+  },
+  // REGRESSION (BUG 1): the same, in JSX's camelCase `tabIndex`.
+  {
+    code: '<div aria-hidden="true" tabIndex="0">x</div>',
     errors: [{ messageId: 'focusableHidden', data: { element: 'div' } }],
     output: null,
   },

@@ -50,9 +50,19 @@ function ariaHiddenTrue(node: JSXOpeningElementNode, hasSpread: boolean): Tri {
 }
 
 /**
+ * Read the tabindex attribute in either casing. JSX/React uses the camelCase
+ * `tabIndex`; lowercase `tabindex` is also accepted (some code, and HTML-shaped
+ * JSX, uses it). `tabIndex` wins when both somehow appear.
+ */
+function tabindexState(node: JSXOpeningElementNode, hasSpread: boolean) {
+  const camel = getAttrState(node, 'tabIndex', hasSpread);
+  return camel.presence !== 'absent' ? camel : getAttrState(node, 'tabindex', hasSpread);
+}
+
+/**
  * Can this element receive focus? 'yes' = tab-focusable, 'no' = not (including
- * the deliberate tabindex="-1" de-focus pattern), 'unknown' = a dynamic value
- * (or a component) we cannot evaluate. A literal tabindex overrides native
+ * the deliberate tabIndex="-1" de-focus pattern), 'unknown' = a dynamic value
+ * (or a component) we cannot evaluate. A literal tabIndex overrides native
  * focusability: >= 0 focusable, -1 not.
  */
 function isFocusable(node: JSXOpeningElementNode): Tri {
@@ -62,8 +72,8 @@ function isFocusable(node: JSXOpeningElementNode): Tri {
   // A spread could carry a tabindex that changes focusability either way.
   if (hasSpread) return 'unknown';
 
-  const ti = getAttrState(node, 'tabindex', hasSpread);
-  if (ti.presence === 'unknown') return 'unknown'; // tabindex={expr}
+  const ti = tabindexState(node, hasSpread);
+  if (ti.presence === 'unknown') return 'unknown'; // tabIndex={expr}
   if (ti.presence === 'present') {
     if (ti.value === null) return 'unknown';
     const raw = ti.value.trim();
