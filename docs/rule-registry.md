@@ -134,7 +134,7 @@ These surface as located errors + suggested fixes. Never auto-applied. Humans ap
 
 | id | status | basis | confidence band | spec citation |
 |----|--------|-------|-----------------|---------------|
-| `interactive-role-required` | SHIPPED | inferred → declared via config | intrinsic: report-only · declared: auto-fix | WCAG 2.1 SC 4.1.2 — UI components must have a role. Non-semantic elements with event handlers need one. |
+| `interactive-role-required` | SHIPPED | inferred → declared via config | intrinsic: child-inspected suggestion / report-only / silent · declared: auto-fix | WCAG 2.1 SC 4.1.2 — UI components must have a role. Non-semantic elements with event handlers need one. |
 | `control-needs-name` | CANDIDATE | inferred | 70–99% | WCAG 2.1 SC 4.1.2 — UI components must have an accessible name. Cannot author the name text — flagging only. |
 | `img-needs-alt` | CANDIDATE | native* | 100% | WCAG 2.1 SC 1.1.1 — All non-decorative images need alt text. Cannot author the text — flagging only. |
 | `idref-resolves` | CANDIDATE | native | 100% (in-file) | WAI-ARIA 1.2 §7 — aria-labelledby/describedby/controls MUST reference a valid id. In-file check only. |
@@ -145,25 +145,65 @@ the fix would author alt text (an asserted value), so it stays lint-tier.
 
 ### `interactive-role-required` — confidence policy and bridge wiring
 
-The first lint-tier rule, and the precedent for every one after it.
+The first lint-tier rule, and the precedent for every one after it. Its
+confidence policy has been revised as the rule matured; this section is the
+current, authoritative version (superseding the earlier "single default
+suggestion" and, briefly, "report-only for everything" formulations).
 
-**Confidence policy — intrinsic path is REPORT ONLY (no fix, no
-suggestion).** A confidently-resolved `generic` intrinsic element (div,
-span, bare `<a>`) with a confirmed click handler is flagged, but nothing is
-proposed. The rule originally suggested `role="button"`; that was withdrawn
-because the correct role depends on what the element is *for* — its text,
-its icon, whether it wraps other interactive elements — which the rule
-cannot see. A drag handle, a hover-card trigger, an analytics wrapper, and a
-real clickable card are byte-identical at the div-with-onClick level and
-want different roles (or none). Proposing `role="button"` for all of them is
-a confident-sounding wrong answer some of the time, so the rule hands the
-decision to a human: a located diagnostic naming the problem, with examples
-(`button`, `link`, `menuitem`) but no hardcoded pick. This is the precedent:
-when there is no single defensible answer, flag — do not guess one. Everything
-short of a confident `generic` is silent: an explicit role in any form, a
-spread (could carry a role or handler), a handler expression we cannot
-confirm is real (conditionals, `undefined`), non-generic implicit semantics
-(`<h1 onClick>`), and undecidable ancestor-dependent roles.
+**Detection (unchanged across revisions):** a confidently-resolved `generic`
+intrinsic element (div, span, bare `<a>`) with a *confirmed* click handler
+and no role. Everything short of that is silent: an explicit role in any
+form, a spread (could carry a role or handler), a handler expression we
+cannot confirm is real (conditionals, `undefined`), non-generic implicit
+semantics (`<h1 onClick>`), and undecidable ancestor-dependent roles.
+
+**Confidence policy — the intrinsic path inspects the element's CHILDREN**,
+not merely the presence of `onClick`, and sorts into three outcomes:
+
+- **Confident → a `role="button"` SUGGESTION** (never an auto-fix; see the
+  gate note below) in two narrow, defensible shapes: (1) *icon-only* — no
+  text anywhere in the subtree and exactly one non-interactive intrinsic
+  element child (`<svg>`, `<i>`, `<img>`); (2) a *single short action-like
+  text child* and no element children (`<div onClick>Save</div>`). The
+  label bar is deliberately minimal — one text child, trimmed, ≤ 3 words —
+  not a verb dictionary.
+- **Silent → report nothing** when the element *contains a nested
+  interactive element* (a native control, an element with a widget role per
+  aria-query's superclass chain, or another generic-with-onClick). That is a
+  **different bug — invalid nesting of interactive elements — and an explicit
+  non-goal of this rule**, not an oversight. Suggesting a role on the outer
+  element would compound it. Each interactive child is still judged on its
+  own merits; only the outer wrapper is left alone. This also governs the
+  "several independently-clickable children" shape (a toolbar-like
+  container): its children are interactive, so the container stays silent
+  rather than being flagged.
+- **Report-only → flag, no fix, no suggestion** for the genuinely ambiguous
+  remainder: a card-like mix of image + text + nested content, a long text
+  body, an empty or whitespace-only element, or — importantly — any element
+  whose contents are *unknown*: a nested component (its output is invisible
+  from the call site and may itself be interactive) or a dynamic
+  `{expression}`. The role can't be inferred, but the missing role is still
+  a real finding. No guessing `menuitem`/`tab`/etc.: those need parent
+  context (is it inside `role="menu"`?) that is a candidate for a *future*
+  rule, not this one.
+
+**Two deliberate conservatism calls, flagged for the record:** an icon that
+is a *component* (`<div onClick><Icon/></div>`) is report-only, not a
+confident suggestion, because the resolver cannot confirm the component is
+non-interactive; and an *icon+text* labeled button
+(`<div onClick><svg/>Save</div>`) is report-only, because it matches neither
+narrow confident shape (it has both an element and text). Both err toward
+report-only rather than a guess.
+
+**The gate, not a convention, is why confidence never buys an auto-fix.**
+Every intrinsic diagnostic is `basis: inferred`. `emit` maps inferred to a
+host *suggestion*, and the core gate throws on any inferred + auto-fix
+pairing (`assertGate`). So even the confident cases produce a suggestion a
+human approves; raising confidence cannot loosen this. The test
+`confident intrinsic suggestion is a suggestion, never a fix` proves it on
+this real rule (RuleTester shows the suggestion output yet `output: null`;
+`verifyAndFix` writes nothing), and the oxlint parity harness proves the
+same on the other host (oxlint never applies suggestions under `--fix`).
 
 **Unknown custom components are silent, not guessed at.** Their rendered
 output is invisible from the call site and is very often already a native
@@ -194,9 +234,10 @@ The mechanism: `componentSemantics` in aria.config.ts changes `basis: inferred` 
 
 **Config bridge status: live — consumed by `interactive-role-required`**
 (component name match in `componentSemantics` → declared basis → an
-auto-applied fix inserting the declared role, where without config the
-component would be silent and an intrinsic element would be a report-only
-flag; see that rule's section above). Originally built and tested standalone:
+auto-applied fix inserting the declared role; without config that component
+is silent, while an intrinsic element is handled by the child-inspection
+policy — suggestion, report-only, or silent; see that rule's section above).
+Originally built and tested standalone:
 `@aria/config` now ships the full mechanism: `loadAriaConfig(searchFrom)`
 (cosmiconfig, upward search to the filesystem root over
 `aria.config.{ts,js,cjs,json}` / `.ariarc(.json)`; "no config" is a

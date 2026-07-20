@@ -3,13 +3,20 @@
  * the ESLint RuleTester suite and the oxlint parity harness
  * (scripts/oxlint-parity.mjs) — one source, two hosts.
  *
- * First lint-tier rule. The intrinsic fixtures (`output: null`, no
- * `suggestions`) are REPORT ONLY: basis inferred, nothing to apply or even
- * suggest, because the correct role depends on intent the rule cannot see
- * (see the rule's confidence-policy docblock). The parity harness asserts
- * --fix leaves the code byte-identical on both hosts. The DeclaredButton
- * fixtures exercise the config bridge: with the componentSemantics entry in
- * `ruleOptions`, the basis is declared and the fix IS auto-applied.
+ * First lint-tier rule. The intrinsic path inspects children (see the rule's
+ * confidence-policy docblock) and sorts into three outcomes:
+ *   - CONFIDENT (icon-only, or a single short action-like text child):
+ *     `output: null` (basis inferred means the fix can ONLY be a suggestion,
+ *     never auto-applied) PLUS a `suggestions` entry carrying the role="button"
+ *     output. The parity harness confirms --fix leaves the code byte-identical
+ *     on both hosts — the gate holding on a real rule, not just a synthetic one.
+ *   - REPORT ONLY (ambiguous / empty / unknown children): `output: null`, no
+ *     `suggestions`.
+ *   - SILENT (nested interactive element): a `valid` fixture — the outer
+ *     element is left entirely alone (invalid-nesting is a different bug).
+ * The DeclaredButton fixtures exercise the config bridge: with the
+ * componentSemantics entry in `ruleOptions`, the basis is declared and the
+ * fix IS auto-applied.
  *
  * NOTE: this module must stay erasable TypeScript with no imports — the
  * parity script loads it directly under plain Node via type stripping.
@@ -78,36 +85,140 @@ export const valid: string[] = [
 
   // Declared component whose usage already has a role. Silent.
   '<DeclaredButton role="button" onClick={handleClick} />',
+
+  // ---- Case 3: nested interactive element → SILENT on the outer element. ----
+  // A generic element wrapping a real control is invalid nesting of
+  // interactive elements — a DIFFERENT bug, out of scope. Suggesting a role on
+  // the outer element would compound it, so we leave the outer alone entirely.
+  '<div onClick={handleClick}><button>Submit</button></div>',
+  '<div onClick={handleClick}><a href="/x">Home</a></div>',
+  // Interactive descendant found at depth, not just as a direct child.
+  '<div onClick={handleClick}><span><button>Deep</button></span></div>',
+  // Several independently-clickable children: each is interactive, so the
+  // outer container stays silent (each child is judged on its own merits).
+  '<div onClick={handleClick}><button>a</button><button>b</button></div>',
 ];
 
 export const invalid: InvalidFixture[] = [
-  // ---- Inferred basis: REPORT ONLY, no fix, no suggestion. ----
-  // The right role depends on what the element does, which the rule cannot
-  // see, so there is nothing safe to propose — just a located flag.
+  // ---- Cases 1 & 2: CONFIDENT — a role="button" SUGGESTION (never a fix). ----
+  // `output: null` proves nothing is auto-applied; the `suggestions` entry
+  // carries what a human would get if they accept it.
+
+  // Case 1: icon-only (a single non-interactive element child, no text).
   {
-    code: '<div onClick={handleClick}>x</div>',
+    code: '<div onClick={handleClick}><svg /></div>',
+    errors: [
+      {
+        messageId: 'inferButtonRole',
+        data: { element: 'div' },
+        suggestions: [
+          {
+            messageId: 'inferButtonRole',
+            output: '<div role="button" onClick={handleClick}><svg /></div>',
+          },
+        ],
+      },
+    ],
+    output: null,
+  },
+  {
+    code: '<span onClick={handleClick}><i /></span>',
+    errors: [
+      {
+        messageId: 'inferButtonRole',
+        data: { element: 'span' },
+        suggestions: [
+          {
+            messageId: 'inferButtonRole',
+            output: '<span role="button" onClick={handleClick}><i /></span>',
+          },
+        ],
+      },
+    ],
+    output: null,
+  },
+
+  // Case 2: a single short action-like text child, no element children.
+  {
+    code: '<div onClick={handleClick}>Save</div>',
+    errors: [
+      {
+        messageId: 'inferButtonRole',
+        data: { element: 'div' },
+        suggestions: [
+          {
+            messageId: 'inferButtonRole',
+            output: '<div role="button" onClick={handleClick}>Save</div>',
+          },
+        ],
+      },
+    ],
+    output: null,
+  },
+  // Same confident path reached via other confirmed handler forms (arrow,
+  // member expression), so the handler-detection coverage is preserved.
+  {
+    code: '<div onClick={() => remove()}>Delete</div>',
+    errors: [
+      {
+        messageId: 'inferButtonRole',
+        data: { element: 'div' },
+        suggestions: [
+          {
+            messageId: 'inferButtonRole',
+            output: '<div role="button" onClick={() => remove()}>Delete</div>',
+          },
+        ],
+      },
+    ],
+    output: null,
+  },
+  {
+    code: '<a onClick={handlers.close}>Close</a>',
+    errors: [
+      {
+        messageId: 'inferButtonRole',
+        data: { element: 'a' },
+        suggestions: [
+          {
+            messageId: 'inferButtonRole',
+            output: '<a role="button" onClick={handlers.close}>Close</a>',
+          },
+        ],
+      },
+    ],
+    output: null,
+  },
+
+  // ---- Cases 4 & 5: REPORT ONLY — flag, no fix, no suggestion. ----
+
+  // Case 4: card-like mix of children, no single-action signal.
+  {
+    code: '<div onClick={handleClick}><img src="a.png" /><span>Title</span></div>',
+    errors: [{ messageId: 'missingRole', data: { element: 'div' } }],
+    output: null,
+  },
+  // Long text is not a button label.
+  {
+    code: '<div onClick={handleClick}>This is a paragraph of descriptive prose</div>',
+    errors: [{ messageId: 'missingRole', data: { element: 'div' } }],
+    output: null,
+  },
+  // Unknown contents: a nested component (could be interactive, could be an
+  // icon — cannot tell), and a dynamic {expression}. Flag, do not guess.
+  {
+    code: '<div onClick={handleClick}><Icon /></div>',
     errors: [{ messageId: 'missingRole', data: { element: 'div' } }],
     output: null,
   },
   {
-    code: '<span onClick={handleClick}>x</span>',
-    errors: [{ messageId: 'missingRole', data: { element: 'span' } }],
-    output: null,
-  },
-  // Bare <a> without href resolves to generic — the classic JS-link.
-  {
-    code: '<a onClick={handleClick}>x</a>',
-    errors: [{ messageId: 'missingRole', data: { element: 'a' } }],
-    output: null,
-  },
-  // Confirmed handler forms: arrow, member expression.
-  {
-    code: '<div onClick={() => save()}>x</div>',
+    code: '<div onClick={handleClick}>{label}</div>',
     errors: [{ messageId: 'missingRole', data: { element: 'div' } }],
     output: null,
   },
+  // Case 5: empty / whitespace-only — nothing to infer from.
   {
-    code: '<div onClick={handlers.save}>x</div>',
+    code: '<div onClick={handleClick} />',
     errors: [{ messageId: 'missingRole', data: { element: 'div' } }],
     output: null,
   },

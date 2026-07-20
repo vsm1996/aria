@@ -37,40 +37,20 @@ describe('interactive-role-required', () => {
  * diagnostic whose fix is genuinely auto-applied: config turned a guess into
  * ground truth and the emitted fix kind flipped with it.
  *
- * The inferred half of the contract — a located diagnostic that surfaces but
- * carries nothing to apply — is proven on the intrinsic element below. That
- * path is REPORT ONLY by design: unlike a config-declared component, the
- * correct role for a bare generic element depends on what it is for (its
- * text, its icon, whether it wraps other interactive elements), which the
- * rule cannot see, so there is no single defensible role to suggest. It lost
- * the role="button" suggestion it originally shipped with precisely because
- * that suggestion implied an intent the rule does not actually know.
+ * The inferred intrinsic path is the OTHER half: whatever it decides —
+ * report-only for ambiguous content, or a confident role="button" suggestion
+ * for an icon-only / short-label element — it is inferred basis, so the gate
+ * guarantees it can never become an auto-fix. Only the declared component
+ * path below writes anything. That contrast is the whole architecture.
  */
 describe('graduation contrast (config bridge, end to end)', () => {
   const CONFIG = { componentSemantics: { DeclaredButton: { role: 'button' as const } } };
   const COMPONENT_USAGE = '<DeclaredButton onClick={handleClick} />';
-  const INTRINSIC_USAGE = '<div onClick={handleClick}>x</div>';
 
   it('no matching config: nothing declared, nothing guessed, nothing written', () => {
     tester.run('interactive-role-required', interactiveRoleRequired, {
       valid: [{ code: COMPONENT_USAGE, options: [{}] }],
       invalid: [],
-    });
-  });
-
-  it('intrinsic element: inferred basis is REPORT ONLY — no fix, no suggestion, nothing auto-applied', () => {
-    tester.run('interactive-role-required', interactiveRoleRequired, {
-      valid: [],
-      invalid: [
-        {
-          code: INTRINSIC_USAGE,
-          options: [{}],
-          // No `suggestions` key: RuleTester asserts the diagnostic offers
-          // none. `output: null` asserts no autofix was applied either.
-          errors: [{ messageId: 'missingRole' }],
-          output: null,
-        },
-      ],
     });
   });
 
@@ -86,6 +66,58 @@ describe('graduation contrast (config bridge, end to end)', () => {
         },
       ],
     });
+  });
+});
+
+/**
+ * THE GATE HOLDS ON A REAL RULE. Raising the intrinsic path's confidence did
+ * not loosen the gate: a confident case emits a role="button" SUGGESTION, and
+ * because its basis is inferred, that suggestion can never be auto-applied.
+ * RuleTester proves it (a `suggestions` entry with the added-role output, yet
+ * `output: null`); `verifyAndFix` re-proves it directly (nothing written); and
+ * the oxlint parity harness proves the same on the other host (oxlint never
+ * applies suggestions under --fix). Same discipline as the synthetic
+ * gate-misuse test below, on a real rule this time.
+ */
+describe('confident intrinsic suggestion is a suggestion, never a fix', () => {
+  const CONFIDENT = '<div onClick={handleClick}>Save</div>';
+
+  it('RuleTester: a suggestion is offered, but no autofix is applied', () => {
+    tester.run('interactive-role-required', interactiveRoleRequired, {
+      valid: [],
+      invalid: [
+        {
+          code: CONFIDENT,
+          errors: [
+            {
+              messageId: 'inferButtonRole',
+              suggestions: [
+                {
+                  messageId: 'inferButtonRole',
+                  output: '<div role="button" onClick={handleClick}>Save</div>',
+                },
+              ],
+            },
+          ],
+          output: null, // the fix is a suggestion — never auto-applied
+        },
+      ],
+    });
+  });
+
+  it('verifyAndFix writes nothing for the confident inferred case', () => {
+    const linter = new Linter();
+    const config = {
+      plugins: { aria: { rules: { r: interactiveRoleRequired } } },
+      rules: { 'aria/r': 'error' },
+      languageOptions,
+    } as const;
+    const messages = linter.verify(CONFIDENT, config);
+    expect(messages).toHaveLength(1);
+    expect(messages[0]?.messageId).toBe('inferButtonRole');
+    expect(messages[0]?.fix).toBeUndefined(); // no host fix —
+    expect(messages[0]?.suggestions).toHaveLength(1); // — a suggestion instead
+    expect(linter.verifyAndFix(CONFIDENT, config).output).toBe(CONFIDENT); // nothing written
   });
 });
 

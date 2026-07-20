@@ -1,11 +1,13 @@
 import type { Rule } from 'eslint';
 import type { AriaRuleMeta } from '@aria/core';
 import { resolveComponentSemantic } from '@aria/config';
+import { roles } from 'aria-query';
 import { emit } from '../util/emit';
 import { configForRule } from '../util/load-config';
 import {
   effectiveRole,
   hasSpreadAttribute,
+  intrinsicTag,
   type JSXAttributeNode,
   type JSXOpeningElementNode,
 } from '../util/resolve-role';
@@ -22,26 +24,45 @@ export const ruleMeta: AriaRuleMeta = {
 
 // The first lint-tier rule: detection is a judgment call, so the basis is
 // 'inferred' and it lives in the lint tier. `emit` derives the host fix kind
-// from the basis; this rule never chooses it.
+// from the basis; this rule never chooses it. Crucially, an inferred-basis
+// fix can ONLY ever become a suggestion — the gate makes an inferred auto-fix
+// structurally impossible — so even the "confident" cases below are suggestions
+// a human approves, never silent writes. That is a property of the gate, not a
+// lint-tier convention: raising confidence cannot loosen it.
 //
-// Confidence policy (precedent for every lint rule after it):
+// Confidence policy (precedent for every lint rule after it). The intrinsic
+// path inspects the element's CHILDREN, not just the presence of onClick, and
+// sorts into three outcomes:
 //
-//   Intrinsic path — REPORT ONLY, no fix, no suggestion. Whether a generic
-//   element with a click handler wants button / link / menuitem / something
-//   else depends entirely on what it IS FOR — its text, its icon, whether it
-//   wraps other interactive elements. A drag handle, a hover-card trigger, an
-//   analytics wrapper, and a real clickable card are byte-identical at the
-//   div-with-onClick level and want different roles. The rule cannot see
-//   intent, so there is no single defensible answer to propose. Proposing one
-//   anyway (e.g. role="button") would be a confident-sounding wrong answer
-//   some of the time. So we flag and hand it to a human — a located
-//   diagnostic, nothing to apply.
+//   SUGGEST role="button" (basis inferred → a suggestion, never auto-applied):
+//     1. Icon-only — no text anywhere, exactly one non-interactive intrinsic
+//        element child (e.g. <svg>, <i>, <img>), no nested interactive element.
+//     2. A single short action-like text child, no element children
+//        (e.g. <div onClick>Save</div>). Deliberately narrow: single text
+//        child, trimmed, <= 3 words — not a verb dictionary, just a label bar.
 //
-//   Component path — the config bridge is the one place a known answer
-//   exists. When componentSemantics declares the component's role, the basis
-//   is 'declared' and the diagnostic carries a real auto-applied fix. An
-//   unknown custom component gets silence, not a guess: its rendered output
-//   is invisible from the call site and may already be a native <button>.
+//   SILENT — report nothing at all:
+//     3. Contains a nested interactive element (a native control, an element
+//        with a widget role, or another generic-with-onClick). That is a
+//        DIFFERENT bug — invalid nesting of interactive elements — and out of
+//        scope for this rule. Suggesting a role on the outer element would
+//        compound it, so we stay silent on the outer element entirely. Not an
+//        oversight: an explicit non-goal (see docs/rule-registry.md).
+//
+//   REPORT ONLY — flag, no fix, no suggestion (the shipped behavior):
+//     4. Multiple / mixed / structural children with no single-action signal
+//        (a card-like image+text+nested mix, several children with their own
+//        handlers). Menuitem/tab/etc. need parent context this rule cannot
+//        see — a candidate for a future rule, not a guess here.
+//     5. Empty element, or only whitespace. Nothing to infer from.
+//   Also report-only: anything with an UNKNOWN child (a nested component or a
+//   dynamic {expression}) whose contents we cannot resolve — we cannot be
+//   confident, but the missing role is still a real finding worth flagging.
+//
+//   Component path — the config bridge is the one place a KNOWN answer exists.
+//   When componentSemantics declares the component's role, the basis is
+//   'declared' and the diagnostic carries a real auto-applied fix. An unknown
+//   custom component gets silence, not a guess.
 
 /** Expression forms we can confirm are a real click handler. */
 const HANDLER_EXPRESSIONS = new Set([
@@ -50,6 +71,31 @@ const HANDLER_EXPRESSIONS = new Set([
   'MemberExpression',
   'CallExpression',
 ]);
+
+// Minimal JSX child shapes this rule reads (the host union omits JSX).
+interface JSXTextNode {
+  type: 'JSXText';
+  value: string;
+}
+interface JSXExpressionContainerChild {
+  type: 'JSXExpressionContainer';
+  expression: { type: string };
+}
+interface JSXFragmentChild {
+  type: 'JSXFragment';
+  children: JSXChildNode[];
+}
+interface JSXElementChild {
+  type: 'JSXElement';
+  openingElement: JSXOpeningElementNode;
+  children: JSXChildNode[];
+}
+type JSXChildNode =
+  | JSXTextNode
+  | JSXExpressionContainerChild
+  | JSXFragmentChild
+  | JSXElementChild
+  | { type: string };
 
 function hasConfirmedClickHandler(node: JSXOpeningElementNode): boolean {
   for (const attr of node.attributes) {
@@ -71,17 +117,101 @@ function hasRoleAttribute(node: JSXOpeningElementNode): boolean {
   );
 }
 
+/** A role is interactive iff its ARIA superclass chain includes `widget`. */
+function isWidgetRole(role: string): boolean {
+  const definition = roles.get(role as Parameters<typeof roles.get>[0]);
+  if (definition === undefined) return false;
+  return (definition.superClass ?? []).some((chain) => chain.includes('widget'));
+}
+
+/**
+ * Interactivity of a single child element, positively determined:
+ *  - 'interactive'     : a confirmed widget-role element, or a generic element
+ *                        that itself carries a confirmed click handler (another
+ *                        would-be-flagged case — invalid nesting).
+ *  - 'unknown'         : a component or spread element whose semantics we
+ *                        cannot see; could be interactive, so not safe to
+ *                        treat as confirmed either way.
+ *  - 'non-interactive' : a resolvable non-widget element, or a bare visual
+ *                        (svg, img) with no handler.
+ */
+function elementInteractivity(
+  el: JSXOpeningElementNode,
+): 'interactive' | 'unknown' | 'non-interactive' {
+  const tag = intrinsicTag(el);
+  if (tag === null) return 'unknown'; // component / member / namespaced
+  if (hasSpreadAttribute(el)) return 'unknown'; // spread could add role or handler
+  const role = effectiveRole(el, tag);
+  if (role !== null && isWidgetRole(role)) return 'interactive';
+  if ((role === null || role === 'generic') && hasConfirmedClickHandler(el)) return 'interactive';
+  return 'non-interactive';
+}
+
+interface SubtreeScan {
+  /** A confirmed interactive element exists somewhere in the subtree. */
+  interactive: boolean;
+  /** A component or dynamic {expression} exists — contents unresolvable. */
+  unknown: boolean;
+  /** Any non-whitespace text exists anywhere in the subtree. */
+  text: boolean;
+}
+
+const isWhitespace = (value: string): boolean => value.trim() === '';
+
+const isMeaningfulText = (child: JSXChildNode): boolean =>
+  child.type === 'JSXText' && !isWhitespace((child as JSXTextNode).value);
+
+const isDynamicChild = (child: JSXChildNode): boolean =>
+  child.type === 'JSXExpressionContainer' &&
+  (child as JSXExpressionContainerChild).expression?.type !== 'JSXEmptyExpression';
+
+function scanSubtree(children: JSXChildNode[], scan: SubtreeScan): void {
+  for (const child of children) {
+    switch (child.type) {
+      case 'JSXText':
+        if (!isWhitespace((child as JSXTextNode).value)) scan.text = true;
+        break;
+      case 'JSXElement': {
+        const el = child as JSXElementChild;
+        const kind = elementInteractivity(el.openingElement);
+        if (kind === 'interactive') scan.interactive = true;
+        else if (kind === 'unknown') scan.unknown = true;
+        scanSubtree(el.children ?? [], scan);
+        break;
+      }
+      case 'JSXFragment':
+        scanSubtree((child as JSXFragmentChild).children ?? [], scan);
+        break;
+      case 'JSXExpressionContainer':
+        if (isDynamicChild(child)) scan.unknown = true;
+        break;
+      default:
+        scan.unknown = true; // JSXSpreadChild and anything unmodelled
+    }
+  }
+}
+
+/** A single, short, label-like text node — the narrow bar for case 2. */
+function isShortActionLabel(child: JSXChildNode): boolean {
+  if (child.type !== 'JSXText') return false;
+  const text = (child as JSXTextNode).value.trim();
+  return text.length > 0 && text.length <= 40 && text.split(/\s+/).length <= 3;
+}
+
 export const interactiveRoleRequired: Rule.RuleModule = {
   meta: {
     type: 'suggestion',
     docs: { description: ruleMeta.description },
-    // `fixable` for the component path's declared-basis auto-fix. No path
-    // emits a `suggest` any more (the intrinsic path is report-only), so
-    // `hasSuggestions` is intentionally absent.
+    // `fixable` for the component path's declared-basis auto-fix;
+    // `hasSuggestions` for the intrinsic path's confident, inferred-basis
+    // suggestions. The gate keeps the latter a suggestion, never a fix.
     fixable: 'code',
+    hasSuggestions: true,
     messages: {
       missingRole:
         '<{{element}}> has a click handler but no role, so assistive technology cannot tell it is interactive (interactive-role-required; WCAG 2.1 SC 4.1.2). The correct role cannot be inferred automatically — it depends on what this element does; assign one that matches its actual behavior (e.g. button, link, menuitem), or use a native interactive element.',
+      inferButtonRole:
+        '<{{element}}> has a click handler but no role, so assistive technology cannot tell it is interactive (interactive-role-required; WCAG 2.1 SC 4.1.2). Its contents look button-like — add role="button" (a suggestion to verify, never auto-applied), or use a native <button>.',
       declaredRoleMissing:
         "<{{component}}> is declared as role '{{role}}' via componentSemantics, but this usage carries no role attribute (interactive-role-required; basis: declared).",
     },
@@ -137,16 +267,73 @@ export const interactiveRoleRequired: Rule.RuleModule = {
         // and undecidable roles stay silent.
         if (effectiveRole(node, name) !== 'generic') return;
 
-        // Report only — no fix, no suggestion. The right role depends on
-        // intent the rule cannot see (see the confidence policy above), so
-        // there is no single defensible answer to propose. `emit` with no
-        // `fix` makes this a plain located diagnostic.
-        emit(context, {
-          node: esNode,
-          messageId: 'missingRole',
-          data: { element: name },
-          basis: 'inferred',
-        });
+        // Inspect the children to decide between confident suggestion, total
+        // silence, and report-only (see the confidence policy above).
+        const parent = node.parent as { type?: string; children?: JSXChildNode[] } | undefined;
+        const children = parent?.type === 'JSXElement' ? (parent.children ?? []) : [];
+
+        const scan: SubtreeScan = { interactive: false, unknown: false, text: false };
+        scanSubtree(children, scan);
+
+        // Case 3: a confirmed interactive descendant. That is invalid nesting
+        // of interactive elements — a different bug, explicitly out of scope.
+        // Stay silent on the outer element rather than compound it.
+        if (scan.interactive) return;
+
+        const directText = children.filter(isMeaningfulText);
+        const directElements = children.filter((c) => c.type === 'JSXElement');
+        const directDynamic = children.filter(isDynamicChild);
+        const directFragments = children.filter((c) => c.type === 'JSXFragment');
+        const meaningful =
+          directText.length + directElements.length + directDynamic.length + directFragments.length;
+
+        const reportOnly = () =>
+          emit(context, {
+            node: esNode,
+            messageId: 'missingRole',
+            data: { element: name },
+            basis: 'inferred',
+          });
+
+        // Case 5: empty or whitespace-only — nothing to infer from.
+        if (meaningful === 0) return reportOnly();
+
+        // Unknown contents (a nested component or a dynamic {expression}): we
+        // cannot be confident, but the missing role is still worth flagging.
+        if (scan.unknown) return reportOnly();
+
+        // From here: no interactive descendant, no unknown contents — the
+        // subtree is text and non-interactive intrinsic elements only.
+
+        const onlyDirectChildIsAn = (kindCount: number) =>
+          meaningful === 1 && kindCount === 1;
+
+        // Case 2: a single short action-like text child, no elements.
+        if (onlyDirectChildIsAn(directText.length) && isShortActionLabel(directText[0]!)) {
+          return emit(context, {
+            node: esNode,
+            messageId: 'inferButtonRole',
+            data: { element: name },
+            basis: 'inferred',
+            fix: insertRole('button'),
+          });
+        }
+
+        // Case 1: icon-only — a single non-interactive element child, no text
+        // anywhere in the subtree.
+        if (!scan.text && onlyDirectChildIsAn(directElements.length)) {
+          return emit(context, {
+            node: esNode,
+            messageId: 'inferButtonRole',
+            data: { element: name },
+            basis: 'inferred',
+            fix: insertRole('button'),
+          });
+        }
+
+        // Case 4: multiple / mixed / structural children — genuinely
+        // ambiguous. Flag it, propose nothing.
+        return reportOnly();
       },
     };
   },
