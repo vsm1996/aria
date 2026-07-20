@@ -12,7 +12,7 @@ export class AriaConfigError extends Error {
 }
 
 const TOP_LEVEL_KEYS = new Set(['componentSemantics', 'ignore']);
-const SEMANTIC_KEYS = new Set(['role', 'requiresName', 'source']);
+const SEMANTIC_KEYS = new Set(['role', 'requiresName', 'nameProp', 'source']);
 
 function isPlainObject(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
@@ -77,6 +77,13 @@ export function validateAriaConfig(raw: unknown, source: string): AriaConfig {
           `componentSemantics.${component}.requiresName must be a boolean`,
         );
       }
+      const nameProp = entry['nameProp'];
+      if (nameProp !== undefined && (typeof nameProp !== 'string' || nameProp.trim() === '')) {
+        throw new AriaConfigError(
+          source,
+          `componentSemantics.${component}.nameProp must be a non-empty string`,
+        );
+      }
       // `source: 'declared'` is the schema's whole point; it may be omitted
       // (we normalize it in) but never contradicted.
       const declaredSource = entry['source'];
@@ -89,6 +96,7 @@ export function validateAriaConfig(raw: unknown, source: string): AriaConfig {
       validated[component] = {
         role,
         ...(requiresName !== undefined ? { requiresName } : {}),
+        ...(nameProp !== undefined ? { nameProp } : {}),
         source: 'declared',
       };
     }

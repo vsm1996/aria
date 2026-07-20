@@ -78,7 +78,10 @@ lives in [CLAUDE.md](./CLAUDE.md).
   Report-only, `native` basis: the missing name is a fact, but Aria won't
   invent the alt text (a hard non-goal), so it flags and leaves the words to a
   human. Also native-basis-but-lint-tier, like `idref-resolves`, but because
-  it's unfixable-by-machine rather than uncertain.
+  it's unfixable-by-machine rather than uncertain. Via the config bridge, a
+  component declared `role: 'img'` is checked the same way on its declared
+  accessible-name prop (`nameProp`, defaulting to `alt`) — so a design system's
+  `<Image altText="…">` is understood without assuming the prop is called `alt`.
 - **ESLint ↔ oxlint parity, enforced.** The same rule runs under oxlint's
   experimental `jsPlugins` with zero drift across every fixture — diagnostics,
   locations, and fix output — verified by `pnpm parity:oxlint` on every push
