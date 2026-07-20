@@ -5,7 +5,7 @@
  *
  * First lint-tier rule. The intrinsic path inspects children (see the rule's
  * confidence-policy docblock) and sorts into three outcomes:
- *   - CONFIDENT (icon-only, or a single short action-like text child):
+ *   - CONFIDENT (icon-only, short-text-only, or icon-plus-short-text):
  *     `output: null` (basis inferred means the fix can ONLY be a suggestion,
  *     never auto-applied) PLUS a `suggestions` entry carrying the role="button"
  *     output. The parity harness confirms --fix leaves the code byte-identical
@@ -189,6 +189,24 @@ export const invalid: InvalidFixture[] = [
     ],
     output: null,
   },
+  // Case 1c: icon + short text — one non-interactive element child plus one
+  // short label. The most button-like shape; also confident. Order-agnostic.
+  {
+    code: '<div onClick={handleClick}><svg />Save</div>',
+    errors: [
+      {
+        messageId: 'inferButtonRole',
+        data: { element: 'div' },
+        suggestions: [
+          {
+            messageId: 'inferButtonRole',
+            output: '<div role="button" onClick={handleClick}><svg />Save</div>',
+          },
+        ],
+      },
+    ],
+    output: null,
+  },
 
   // ---- Cases 4 & 5: REPORT ONLY — flag, no fix, no suggestion. ----
 
@@ -201,6 +219,20 @@ export const invalid: InvalidFixture[] = [
   // Long text is not a button label.
   {
     code: '<div onClick={handleClick}>This is a paragraph of descriptive prose</div>',
+    errors: [{ messageId: 'missingRole', data: { element: 'div' } }],
+    output: null,
+  },
+  // Boundary: icon + text keeps the bucket narrow. A LONG text alongside an
+  // icon is NOT a label — report-only, not confident.
+  {
+    code: '<div onClick={handleClick}><svg />This is a long descriptive sentence</div>',
+    errors: [{ messageId: 'missingRole', data: { element: 'div' } }],
+    output: null,
+  },
+  // Boundary: more than one element child alongside the text — not the single
+  // icon + label shape. Report-only.
+  {
+    code: '<div onClick={handleClick}><svg /><img src="a.png" />Save</div>',
     errors: [{ messageId: 'missingRole', data: { element: 'div' } }],
     output: null,
   },

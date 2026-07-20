@@ -34,12 +34,17 @@ export const ruleMeta: AriaRuleMeta = {
 // path inspects the element's CHILDREN, not just the presence of onClick, and
 // sorts into three outcomes:
 //
-//   SUGGEST role="button" (basis inferred → a suggestion, never auto-applied):
-//     1. Icon-only — no text anywhere, exactly one non-interactive intrinsic
-//        element child (e.g. <svg>, <i>, <img>), no nested interactive element.
-//     2. A single short action-like text child, no element children
-//        (e.g. <div onClick>Save</div>). Deliberately narrow: single text
-//        child, trimmed, <= 3 words — not a verb dictionary, just a label bar.
+//   SUGGEST role="button" (basis inferred → a suggestion, never auto-applied)
+//   for button-like children in one of three narrow shapes, nothing else in
+//   the subtree (no dynamic {expression} or fragment children):
+//     1a. Short-text-only — a single short action-like text child, no element
+//         children (e.g. <div onClick>Save</div>). Deliberately narrow: single
+//         text child, trimmed, <= 3 words — not a verb dictionary, a label bar.
+//     1b. Icon-only — no text anywhere, exactly one non-interactive intrinsic
+//         element child (e.g. <svg>, <i>, <img>), no nested interactive element.
+//     1c. Icon + short text — one such element child AND one such short text
+//         child (e.g. <div onClick><svg/>Save</div>): the most button-like
+//         shape of all, a labelled icon button.
 //
 //   SILENT — report nothing at all:
 //     3. Contains a nested interactive element (a native control, an element
@@ -302,14 +307,29 @@ export const interactiveRoleRequired: Rule.RuleModule = {
         // cannot be confident, but the missing role is still worth flagging.
         if (scan.unknown) return reportOnly();
 
-        // From here: no interactive descendant, no unknown contents — the
-        // subtree is text and non-interactive intrinsic elements only.
+        // From here: no interactive descendant, no unknown contents — every
+        // element in the subtree is a non-interactive intrinsic element, and
+        // every child is text or such an element.
 
-        const onlyDirectChildIsAn = (kindCount: number) =>
-          meaningful === 1 && kindCount === 1;
+        // Confident role="button" (cases 1 & 2): the direct children are
+        // exactly one of these narrow, button-like shapes, and nothing else
+        // (no dynamic {expression} or fragment children):
+        //   (a) short-text-only : one short action-like text child, no element;
+        //   (b) icon-only       : one non-interactive element child, no text
+        //                         anywhere in the subtree;
+        //   (c) icon + short text: one such element child AND one short
+        //                         action-like text child (e.g. <svg/>Save).
+        const noDynamicOrFragment = directDynamic.length === 0 && directFragments.length === 0;
+        const oneShortText = directText.length === 1 && isShortActionLabel(directText[0]!);
+        const oneElement = directElements.length === 1;
 
-        // Case 2: a single short action-like text child, no elements.
-        if (onlyDirectChildIsAn(directText.length) && isShortActionLabel(directText[0]!)) {
+        const confident =
+          noDynamicOrFragment &&
+          ((oneShortText && directElements.length === 0) || // (a)
+            (directText.length === 0 && oneElement && !scan.text) || // (b)
+            (oneShortText && oneElement)); // (c)
+
+        if (confident) {
           return emit(context, {
             node: esNode,
             messageId: 'inferButtonRole',
@@ -319,20 +339,8 @@ export const interactiveRoleRequired: Rule.RuleModule = {
           });
         }
 
-        // Case 1: icon-only — a single non-interactive element child, no text
-        // anywhere in the subtree.
-        if (!scan.text && onlyDirectChildIsAn(directElements.length)) {
-          return emit(context, {
-            node: esNode,
-            messageId: 'inferButtonRole',
-            data: { element: name },
-            basis: 'inferred',
-            fix: insertRole('button'),
-          });
-        }
-
-        // Case 4: multiple / mixed / structural children — genuinely
-        // ambiguous. Flag it, propose nothing.
+        // Cases 4 & 5: multiple / mixed / structural children, or a non-label
+        // text body — genuinely ambiguous. Flag it, propose nothing.
         return reportOnly();
       },
     };

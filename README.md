@@ -52,10 +52,11 @@ lives in [CLAUDE.md](./CLAUDE.md).
 - **The first lint-tier rule, with the config bridge live**:
   **`interactive-role-required`** flags a generic element (div, span) with a
   click handler and no role, then inspects its children to decide what to say.
-  An icon-only or short-labelled element (`<div onClick>Save</div>`) gets a
-  `role="button"` *suggestion*; a genuinely ambiguous one (a card-like mix, or
-  unknown/dynamic content) is report-only; and one that already wraps a real
-  interactive element is left alone (that's a different bug). Every one of
+  A button-like element — icon-only, short-labelled, or a labelled icon
+  (`<div onClick><svg/>Save</div>`) — gets a `role="button"` *suggestion*; a
+  genuinely ambiguous one (a card-like mix, or unknown/dynamic content) is
+  report-only; and one that already wraps a real interactive element is left
+  alone (that's a different bug). Every one of
   those is `inferred` basis, so the gate guarantees the suggestion can never be
   auto-applied — proven by test on both hosts. Declare a component's semantics
   in `aria.config.ts` (`componentSemantics: { IconButton: { role: 'button' } }`)
