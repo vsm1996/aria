@@ -3,6 +3,22 @@
 Every rule in the system lives here. A reviewer must be able to learn a rule's
 tier, basis, and spec citation without reading implementation code.
 
+> **Phase 5 validation** ran the full plugin against five OSS React repos; see
+> [validation.md](./validation.md). Two real bugs were found and are flagged as
+> Known Issues below (each gets its own tested follow-up, not a drive-by fix).
+
+## Known issues (found in Phase 5 validation — pending follow-up)
+
+- **`aria-hidden-not-focusable` — React `tabIndex` casing.** `isFocusable`
+  checks lowercase `tabindex`; JSX uses camelCase `tabIndex`, so the
+  spec-recommended `aria-hidden` + `tabIndex="-1"` de-focus pattern is
+  false-positive flagged. Fixable; needs a follow-up PR with fixtures in the
+  React casing. See validation.md, BUG 1.
+- **`control-needs-name` — `aria-hidden` not exempted.** An `aria-hidden="true"`
+  control is out of the accessibility tree and needs no name, but the rule
+  flags it anyway (inconsistent with `img-needs-alt`, which exempts it).
+  Fixable; needs a follow-up PR. See validation.md, BUG 2.
+
 ## Status keys
 
 - `SHIPPED`    — in the npm package, gating CI
