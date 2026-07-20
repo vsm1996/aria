@@ -20,19 +20,28 @@ export const ruleMeta: AriaRuleMeta = {
     'WCAG 2.1 SC 4.1.2 (Name, Role, Value): user interface components must expose a role. A generic element with a click handler exposes none.',
 };
 
-// The first lint-tier rule: detection is a judgment call, so the default
-// basis is 'inferred' and the default surface is a SUGGESTION the human
-// approves — never an auto-fix. The one exception is the config bridge:
-// when componentSemantics declares the component's role, the basis is
-// 'declared' and the same diagnostic carries a real auto-applied fix.
-// `emit` derives the fix kind from the basis; this rule never chooses it.
+// The first lint-tier rule: detection is a judgment call, so the basis is
+// 'inferred' and it lives in the lint tier. `emit` derives the host fix kind
+// from the basis; this rule never chooses it.
 //
-// Confidence policy (precedent for every lint rule after it): ONE clearly
-// defensible default suggestion — role="button" on a bare generic element —
-// or silence. No ranked guesses from weak signals (class names, siblings,
-// parent context). An unknown custom component gets silence, not a guess:
-// its rendered output is invisible from the call site and may already be a
-// native <button>.
+// Confidence policy (precedent for every lint rule after it):
+//
+//   Intrinsic path — REPORT ONLY, no fix, no suggestion. Whether a generic
+//   element with a click handler wants button / link / menuitem / something
+//   else depends entirely on what it IS FOR — its text, its icon, whether it
+//   wraps other interactive elements. A drag handle, a hover-card trigger, an
+//   analytics wrapper, and a real clickable card are byte-identical at the
+//   div-with-onClick level and want different roles. The rule cannot see
+//   intent, so there is no single defensible answer to propose. Proposing one
+//   anyway (e.g. role="button") would be a confident-sounding wrong answer
+//   some of the time. So we flag and hand it to a human — a located
+//   diagnostic, nothing to apply.
+//
+//   Component path — the config bridge is the one place a known answer
+//   exists. When componentSemantics declares the component's role, the basis
+//   is 'declared' and the diagnostic carries a real auto-applied fix. An
+//   unknown custom component gets silence, not a guess: its rendered output
+//   is invisible from the call site and may already be a native <button>.
 
 /** Expression forms we can confirm are a real click handler. */
 const HANDLER_EXPRESSIONS = new Set([
@@ -66,11 +75,13 @@ export const interactiveRoleRequired: Rule.RuleModule = {
   meta: {
     type: 'suggestion',
     docs: { description: ruleMeta.description },
+    // `fixable` for the component path's declared-basis auto-fix. No path
+    // emits a `suggest` any more (the intrinsic path is report-only), so
+    // `hasSuggestions` is intentionally absent.
     fixable: 'code',
-    hasSuggestions: true,
     messages: {
       missingRole:
-        '<{{element}}> has a click handler but no role, so assistive technology cannot tell it is interactive (interactive-role-required; WCAG 2.1 SC 4.1.2). Suggestion: role="button" — or better, a native <button>.',
+        '<{{element}}> has a click handler but no role, so assistive technology cannot tell it is interactive (interactive-role-required; WCAG 2.1 SC 4.1.2). The correct role cannot be inferred automatically — it depends on what this element does; assign one that matches its actual behavior (e.g. button, link, menuitem), or use a native interactive element.',
       declaredRoleMissing:
         "<{{component}}> is declared as role '{{role}}' via componentSemantics, but this usage carries no role attribute (interactive-role-required; basis: declared).",
     },
@@ -126,12 +137,15 @@ export const interactiveRoleRequired: Rule.RuleModule = {
         // and undecidable roles stay silent.
         if (effectiveRole(node, name) !== 'generic') return;
 
+        // Report only — no fix, no suggestion. The right role depends on
+        // intent the rule cannot see (see the confidence policy above), so
+        // there is no single defensible answer to propose. `emit` with no
+        // `fix` makes this a plain located diagnostic.
         emit(context, {
           node: esNode,
           messageId: 'missingRole',
           data: { element: name },
           basis: 'inferred',
-          fix: insertRole('button'),
         });
       },
     };

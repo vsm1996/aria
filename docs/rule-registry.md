@@ -134,7 +134,7 @@ These surface as located errors + suggested fixes. Never auto-applied. Humans ap
 
 | id | status | basis | confidence band | spec citation |
 |----|--------|-------|-----------------|---------------|
-| `interactive-role-required` | SHIPPED | inferred → declared via config | single default suggestion | WCAG 2.1 SC 4.1.2 — UI components must have a role. Non-semantic elements with event handlers need one. |
+| `interactive-role-required` | SHIPPED | inferred → declared via config | intrinsic: report-only · declared: auto-fix | WCAG 2.1 SC 4.1.2 — UI components must have a role. Non-semantic elements with event handlers need one. |
 | `control-needs-name` | CANDIDATE | inferred | 70–99% | WCAG 2.1 SC 4.1.2 — UI components must have an accessible name. Cannot author the name text — flagging only. |
 | `img-needs-alt` | CANDIDATE | native* | 100% | WCAG 2.1 SC 1.1.1 — All non-decorative images need alt text. Cannot author the text — flagging only. |
 | `idref-resolves` | CANDIDATE | native | 100% (in-file) | WAI-ARIA 1.2 §7 — aria-labelledby/describedby/controls MUST reference a valid id. In-file check only. |
@@ -147,16 +147,23 @@ the fix would author alt text (an asserted value), so it stays lint-tier.
 
 The first lint-tier rule, and the precedent for every one after it.
 
-**Confidence policy: one clearly defensible default, or silence.** A
-confidently-resolved `generic` intrinsic element (div, span, bare `<a>`)
-with a confirmed click handler gets exactly one suggestion, `role="button"`
-— the dominant real-world case and the only guess that needs no surrounding
-context. No ranked alternatives from weak signals (class names, siblings,
-parent roles): a menu item or tab needs a parent role this rule cannot
-confirm. Everything short of confidence is silent: an explicit role in any
-form, a spread (could carry a role or handler), a handler expression we
-cannot confirm is real (conditionals, `undefined`), non-generic implicit
-semantics (`<h1 onClick>`), and undecidable ancestor-dependent roles.
+**Confidence policy — intrinsic path is REPORT ONLY (no fix, no
+suggestion).** A confidently-resolved `generic` intrinsic element (div,
+span, bare `<a>`) with a confirmed click handler is flagged, but nothing is
+proposed. The rule originally suggested `role="button"`; that was withdrawn
+because the correct role depends on what the element is *for* — its text,
+its icon, whether it wraps other interactive elements — which the rule
+cannot see. A drag handle, a hover-card trigger, an analytics wrapper, and a
+real clickable card are byte-identical at the div-with-onClick level and
+want different roles (or none). Proposing `role="button"` for all of them is
+a confident-sounding wrong answer some of the time, so the rule hands the
+decision to a human: a located diagnostic naming the problem, with examples
+(`button`, `link`, `menuitem`) but no hardcoded pick. This is the precedent:
+when there is no single defensible answer, flag — do not guess one. Everything
+short of a confident `generic` is silent: an explicit role in any form, a
+spread (could carry a role or handler), a handler expression we cannot
+confirm is real (conditionals, `undefined`), non-generic implicit semantics
+(`<h1 onClick>`), and undecidable ancestor-dependent roles.
 
 **Unknown custom components are silent, not guessed at.** Their rendered
 output is invisible from the call site and is very often already a native
@@ -165,9 +172,10 @@ double semantics. The graduation path below is the sanctioned alternative.
 
 **The config bridge is now live, consumed by this rule.** Mechanism: on a
 capitalized component with a confirmed onClick and no role, the rule calls
-`resolveComponentSemantic(config, componentName)`. A match flips the SAME
-diagnostic from `basis: inferred` (suggestion, never auto-applied) to
-`basis: declared` with a real auto-applied fix inserting the declared role.
+`resolveComponentSemantic(config, componentName)`. A match turns a situation
+that would otherwise be an inferred report (or, for an unknown component,
+silence) into a `basis: declared` diagnostic with a real auto-applied fix
+inserting the declared role — a known answer, not a guess.
 Config comes from inline rule options (deterministic; what tests and the
 parity harness use) or, absent options, from `@aria/config`'s file loader
 searching upward from the linted file. The named test
@@ -185,9 +193,10 @@ The mechanism: `componentSemantics` in aria.config.ts changes `basis: inferred` 
 `basis: declared`, which the `emit` helper translates to an auto-applied `fix`.
 
 **Config bridge status: live — consumed by `interactive-role-required`**
-(component name match in `componentSemantics` → declared basis → the
-suggestion becomes an auto-applied fix inserting the declared role; see that
-rule's section above). Originally built and tested standalone:
+(component name match in `componentSemantics` → declared basis → an
+auto-applied fix inserting the declared role, where without config the
+component would be silent and an intrinsic element would be a report-only
+flag; see that rule's section above). Originally built and tested standalone:
 `@aria/config` now ships the full mechanism: `loadAriaConfig(searchFrom)`
 (cosmiconfig, upward search to the filesystem root over
 `aria.config.{ts,js,cjs,json}` / `.ariarc(.json)`; "no config" is a

@@ -3,12 +3,13 @@
  * the ESLint RuleTester suite and the oxlint parity harness
  * (scripts/oxlint-parity.mjs) — one source, two hosts.
  *
- * First lint-tier rule: invalid fixtures with `output: null` carry a
- * SUGGESTION only (basis inferred — the host must never auto-apply it; the
- * parity harness asserts --fix leaves the code byte-identical on both
- * hosts). The DeclaredButton fixtures exercise the config bridge: with the
- * componentSemantics entry in `ruleOptions`, the basis is declared and the
- * fix IS auto-applied.
+ * First lint-tier rule. The intrinsic fixtures (`output: null`, no
+ * `suggestions`) are REPORT ONLY: basis inferred, nothing to apply or even
+ * suggest, because the correct role depends on intent the rule cannot see
+ * (see the rule's confidence-policy docblock). The parity harness asserts
+ * --fix leaves the code byte-identical on both hosts. The DeclaredButton
+ * fixtures exercise the config bridge: with the componentSemantics entry in
+ * `ruleOptions`, the basis is declared and the fix IS auto-applied.
  *
  * NOTE: this module must stay erasable TypeScript with no imports — the
  * parity script loads it directly under plain Node via type stripping.
@@ -23,7 +24,7 @@ export interface InvalidFixture {
   }[];
   /**
    * Result of ONE fixer pass — the RuleTester `output` contract. `null`
-   * asserts NO autofix was applied (suggestion-only diagnostics).
+   * asserts NO autofix was applied (report-only diagnostics).
    */
   output: string | null;
   /** Result once `--fix` converges, when it differs from the single pass. */
@@ -80,81 +81,34 @@ export const valid: string[] = [
 ];
 
 export const invalid: InvalidFixture[] = [
-  // ---- Inferred basis: suggestion only, NEVER auto-applied. ----
+  // ---- Inferred basis: REPORT ONLY, no fix, no suggestion. ----
+  // The right role depends on what the element does, which the rule cannot
+  // see, so there is nothing safe to propose — just a located flag.
   {
     code: '<div onClick={handleClick}>x</div>',
-    errors: [
-      {
-        messageId: 'missingRole',
-        data: { element: 'div' },
-        suggestions: [
-          {
-            messageId: 'missingRole',
-            output: '<div role="button" onClick={handleClick}>x</div>',
-          },
-        ],
-      },
-    ],
+    errors: [{ messageId: 'missingRole', data: { element: 'div' } }],
     output: null,
   },
   {
     code: '<span onClick={handleClick}>x</span>',
-    errors: [
-      {
-        messageId: 'missingRole',
-        data: { element: 'span' },
-        suggestions: [
-          {
-            messageId: 'missingRole',
-            output: '<span role="button" onClick={handleClick}>x</span>',
-          },
-        ],
-      },
-    ],
+    errors: [{ messageId: 'missingRole', data: { element: 'span' } }],
     output: null,
   },
   // Bare <a> without href resolves to generic — the classic JS-link.
   {
     code: '<a onClick={handleClick}>x</a>',
-    errors: [
-      {
-        messageId: 'missingRole',
-        data: { element: 'a' },
-        suggestions: [
-          { messageId: 'missingRole', output: '<a role="button" onClick={handleClick}>x</a>' },
-        ],
-      },
-    ],
+    errors: [{ messageId: 'missingRole', data: { element: 'a' } }],
     output: null,
   },
   // Confirmed handler forms: arrow, member expression.
   {
     code: '<div onClick={() => save()}>x</div>',
-    errors: [
-      {
-        messageId: 'missingRole',
-        data: { element: 'div' },
-        suggestions: [
-          { messageId: 'missingRole', output: '<div role="button" onClick={() => save()}>x</div>' },
-        ],
-      },
-    ],
+    errors: [{ messageId: 'missingRole', data: { element: 'div' } }],
     output: null,
   },
   {
     code: '<div onClick={handlers.save}>x</div>',
-    errors: [
-      {
-        messageId: 'missingRole',
-        data: { element: 'div' },
-        suggestions: [
-          {
-            messageId: 'missingRole',
-            output: '<div role="button" onClick={handlers.save}>x</div>',
-          },
-        ],
-      },
-    ],
+    errors: [{ messageId: 'missingRole', data: { element: 'div' } }],
     output: null,
   },
 
