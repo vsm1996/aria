@@ -29,7 +29,7 @@ export interface JSXSpreadAttributeNode {
 
 export interface JSXOpeningElementNode {
   type: 'JSXOpeningElement';
-  name: { type: string; name?: string };
+  name: { type: string; name?: string; range: [number, number] };
   attributes: (JSXAttributeNode | JSXSpreadAttributeNode)[];
   parent?: unknown;
 }

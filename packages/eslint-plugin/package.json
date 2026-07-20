@@ -15,7 +15,8 @@
   "dependencies": {
     "@aria/config": "workspace:*",
     "@aria/core": "workspace:*",
-    "aria-query": "^5.3.2"
+    "aria-query": "^5.3.2",
+    "cosmiconfig": "^9.0.2"
   },
   "peerDependencies": {
     "eslint": ">=9"
