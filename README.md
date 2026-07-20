@@ -51,15 +51,16 @@ lives in [CLAUDE.md](./CLAUDE.md).
     tested as a property, not a promise.
 - **The first lint-tier rule, with the config bridge live**:
   **`interactive-role-required`** flags a generic element (div, span) with a
-  click handler and no role. It's report-only — no fix, not even a suggestion,
-  because the right role (button, link, menuitem, …) depends on what the
-  element does, which the linter can't see, so it won't guess one for you.
-  Declare a component's semantics in `aria.config.ts`
-  (`componentSemantics: { IconButton: { role: 'button' } }`) and the story
-  changes: that component graduates to basis `declared` and gets a real
-  auto-fix inserting the role. That report-only vs. declared-autofix contrast
-  is a named test, and both behaviors are verified identical under ESLint and
-  oxlint.
+  click handler and no role, then inspects its children to decide what to say.
+  An icon-only or short-labelled element (`<div onClick>Save</div>`) gets a
+  `role="button"` *suggestion*; a genuinely ambiguous one (a card-like mix, or
+  unknown/dynamic content) is report-only; and one that already wraps a real
+  interactive element is left alone (that's a different bug). Every one of
+  those is `inferred` basis, so the gate guarantees the suggestion can never be
+  auto-applied — proven by test on both hosts. Declare a component's semantics
+  in `aria.config.ts` (`componentSemantics: { IconButton: { role: 'button' } }`)
+  and it graduates: basis `declared`, and now a real auto-fix inserting the
+  role. That inferred-vs-declared contrast is a named end-to-end test.
 - **ESLint ↔ oxlint parity, enforced.** The same rule runs under oxlint's
   experimental `jsPlugins` with zero drift across every fixture — diagnostics,
   locations, and fix output — verified by `pnpm parity:oxlint` on every push
