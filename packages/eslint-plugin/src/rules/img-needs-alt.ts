@@ -7,6 +7,7 @@ import {
   getAttrState,
   hasSpreadAttribute,
   intrinsicTag,
+  isAriaHidden,
   type JSXOpeningElementNode,
 } from '../util/resolve-role';
 
@@ -82,14 +83,8 @@ function hasNameOrDecorativeSignal(
   }
 
   // aria-hidden removes the element from the accessibility tree, so it needs
-  // no name — UNLESS it is explicitly "false" (a dynamic value could be true).
-  const hiddenState = getAttrState(node, 'aria-hidden', hasSpread);
-  if (hiddenState.presence === 'unknown') return true;
-  if (hiddenState.presence === 'present') {
-    if (hiddenState.value === null || hiddenState.value.trim().toLowerCase() !== 'false') {
-      return true;
-    }
-  }
+  // no name (shared with control-needs-name via isAriaHidden).
+  if (isAriaHidden(node, hasSpread)) return true;
 
   return false;
 }

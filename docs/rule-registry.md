@@ -18,10 +18,14 @@ tier, basis, and spec citation without reading implementation code.
   handled `htmlFor`/`for`; all other checked attributes — `id`, `role`,
   `href`, `type`, `list`, `aria-*` — are unchanged in JSX). See validation.md,
   BUG 1.
-- **`control-needs-name` — `aria-hidden` not exempted.** An `aria-hidden="true"`
-  control is out of the accessibility tree and needs no name, but the rule
-  flags it anyway (inconsistent with `img-needs-alt`, which exempts it).
-  Fixable; needs a follow-up PR. See validation.md, BUG 2.
+- **`control-needs-name` — `aria-hidden` not exempted. RESOLVED.** An
+  `aria-hidden` control is now exempted from the name requirement, via a shared
+  `isAriaHidden` helper that `img-needs-alt` was refactored onto too (one check,
+  not two). This is independent of `aria-hidden-not-focusable`: an aria-hidden
+  *focusable* control is still flagged by that rule (both fire independently on
+  the same element), proven by a dedicated test. See validation.md, BUG 2.
+
+Both Phase 5 validation bugs are now resolved.
 
 ## Status keys
 

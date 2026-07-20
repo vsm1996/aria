@@ -86,6 +86,22 @@ export function getAttrState(
 }
 
 /**
+ * Is this element removed from (or possibly removed from) the accessibility
+ * tree by `aria-hidden`? Such an element exposes no name/role to assistive
+ * tech, so name/alt rules do not apply to it. Shared by img-needs-alt and
+ * control-needs-name so both exempt aria-hidden the same way.
+ *
+ * True when aria-hidden is present and not literal `"false"` (boolean
+ * shorthand counts as true), or dynamic (could be true → exempt conservatively).
+ */
+export function isAriaHidden(node: JSXOpeningElementNode, hasSpread: boolean): boolean {
+  const state = getAttrState(node, 'aria-hidden', hasSpread);
+  if (state.presence === 'absent') return false;
+  if (state.presence === 'unknown') return true; // dynamic → could be true
+  return state.value === null || state.value.trim().toLowerCase() !== 'false';
+}
+
+/**
  * Evaluate one aria-query attribute condition against the element.
  * Conditions come in three forms: an exact `value` match, a `set` constraint
  * (attribute present with a value), and an `undefined` constraint (absent).

@@ -40,4 +40,27 @@ describe('control-needs-name', () => {
       ],
     });
   });
+
+  it('exempts aria-hidden controls regardless of focusability (BUG 2)', () => {
+    // These are focusable AND aria-hidden — aria-hidden-not-focusable's
+    // concern, NOT this rule's. control-needs-name must stay silent (there is
+    // no accessible name to require on a hidden element). Proven here in
+    // isolation, since a focusable aria-hidden element trips
+    // aria-hidden-not-focusable and so can't be a shared parity fixture.
+    tester.run('control-needs-name', controlNeedsName, {
+      valid: [
+        { code: '<button aria-hidden="true"></button>' },
+        { code: '<input aria-hidden="true" type="text" />' },
+        { code: '<textarea aria-hidden></textarea>' },
+        // Boolean-false is not hidden → still required to have a name.
+      ],
+      invalid: [
+        {
+          code: '<button aria-hidden="false"><svg /></button>',
+          errors: [{ messageId: 'controlNeedsName', data: { element: 'button', role: 'button' } }],
+          output: null,
+        },
+      ],
+    });
+  });
 });
