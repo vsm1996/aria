@@ -37,11 +37,14 @@ describe('interactive-role-required', () => {
  * diagnostic whose fix is genuinely auto-applied: config turned a guess into
  * ground truth and the emitted fix kind flipped with it.
  *
- * The inferred half of the contract — a suggestion that surfaces but is
- * never auto-applied — is proven on the intrinsic element in the same test,
- * because for unknown components we chose silence over guessing (see the
- * registry's confidence-policy note; the component's rendered output is
- * invisible from the call site).
+ * The inferred half of the contract — a located diagnostic that surfaces but
+ * carries nothing to apply — is proven on the intrinsic element below. That
+ * path is REPORT ONLY by design: unlike a config-declared component, the
+ * correct role for a bare generic element depends on what it is for (its
+ * text, its icon, whether it wraps other interactive elements), which the
+ * rule cannot see, so there is no single defensible role to suggest. It lost
+ * the role="button" suggestion it originally shipped with precisely because
+ * that suggestion implied an intent the rule does not actually know.
  */
 describe('graduation contrast (config bridge, end to end)', () => {
   const CONFIG = { componentSemantics: { DeclaredButton: { role: 'button' as const } } };
@@ -55,25 +58,16 @@ describe('graduation contrast (config bridge, end to end)', () => {
     });
   });
 
-  it('no matching config, intrinsic element: inferred basis surfaces as a suggestion and is NEVER auto-applied', () => {
+  it('intrinsic element: inferred basis is REPORT ONLY — no fix, no suggestion, nothing auto-applied', () => {
     tester.run('interactive-role-required', interactiveRoleRequired, {
       valid: [],
       invalid: [
         {
           code: INTRINSIC_USAGE,
           options: [{}],
-          errors: [
-            {
-              messageId: 'missingRole',
-              suggestions: [
-                {
-                  messageId: 'missingRole',
-                  output: '<div role="button" onClick={handleClick}>x</div>',
-                },
-              ],
-            },
-          ],
-          // null = RuleTester asserts NO autofix was applied.
+          // No `suggestions` key: RuleTester asserts the diagnostic offers
+          // none. `output: null` asserts no autofix was applied either.
+          errors: [{ messageId: 'missingRole' }],
           output: null,
         },
       ],
