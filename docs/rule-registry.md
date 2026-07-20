@@ -142,7 +142,7 @@ its section below).
 | `control-needs-name` | SHIPPED | native (report-only) · declared for the component path | 100% (in-file) | WCAG 2.1 SC 4.1.2 — UI components must have an accessible name. Cannot author the name text — flagging only. |
 | `img-needs-alt` | SHIPPED | native (report-only) | 100% (in-file) | WCAG 2.1 SC 1.1.1 — All non-decorative images need alt text. Cannot author the text — flagging only. |
 | `idref-resolves` | SHIPPED | native (report-only) | 100% (in-file) | WAI-ARIA 1.2 §7 — aria-labelledby/describedby/controls MUST reference a valid id. In-file check only. |
-| `aria-hidden-not-focusable` | CANDIDATE | native | 100% | WAI-ARIA 1.2 §6.6 — aria-hidden=true MUST NOT be applied to a focusable element. Fix is ambiguous → lint. |
+| `aria-hidden-not-focusable` | SHIPPED | native (report-only) | 100% (in-file) | WAI-ARIA 1.2 — aria-hidden=true MUST NOT be applied to a focusable element (or a subtree containing one). Fix is ambiguous → lint. |
 
 *`img-needs-alt` has native basis for the detection (the img tag is known), but
 the fix would author alt text (an asserted value), so it stays lint-tier — see
@@ -419,6 +419,78 @@ is checked for that prop (present non-empty → silent, absent/empty → flagged
 dynamic → silent), plus the same ARIA/content checks on the usage. A `role:
 'img'` component, or one with no resolvable name prop, stays silent (not this
 rule's concern). Basis `declared`, report-only.
+
+### `aria-hidden-not-focusable` — the third reason for native-basis / lint-tier
+
+Flags `aria-hidden="true"` on a focusable element, or on a subtree containing
+a focusable element — a "focusable ghost" a keyboard user can still reach but
+assistive tech cannot describe (WAI-ARIA 1.2). Report-only.
+
+**Basis/tier — a THIRD distinct reason.** The three native-basis lint rules
+now decouple from `format` for three different reasons, a real taxonomy:
+
+- `idref-resolves` — native but lint because the finding is *uncertain*
+  (cross-file resolution) — advisory.
+- `img-needs-alt` / `control-needs-name` — native but lint because
+  *unfixable-by-machine* (only a human can author the content).
+- `aria-hidden-not-focusable` — native but lint because *multiple valid,
+  intent-dependent repairs exist and Aria refuses to pick*: remove the
+  `aria-hidden` (it should be perceivable), add `tabindex="-1"` (it should
+  stay hidden but out of the tab order), or restructure so the control isn't
+  in the hidden subtree. A mechanical fix *is* available here (unlike the
+  middle category) — the rule declines it on purpose.
+
+**Fix/suggestion — considered and declined, for both cases.** A single-element
+`tabindex="-1"` suggestion was weighed against interactive-role-required's
+confident-suggestion precedent and rejected: it is correct only if the author
+*meant* to hide the element. If the `aria-hidden` was accidental, the right
+fix is removing it, and suggesting `tabindex="-1"` would turn a recoverable
+focusable-ghost into a fully keyboard-unreachable control — strictly worse. The
+correct repair depends on unknowable intent, exactly what the plan reserves.
+So: report-only, no fix, no suggestion; the message names the options.
+
+**Focusability — defined, not winged.** Focusable = a native control
+(`<button>`, `<a href>`, non-`hidden` `<input>`, `<select>`, `<textarea>`) OR
+any element with a literal `tabindex` ≥ 0. `tabindex="-1"` is explicitly
+non-focusable (the spec-recommended de-focus pattern), so
+`aria-hidden="true" tabindex="-1"` is correct and silent. A literal `tabindex`
+overrides native focusability either way. Dynamic `tabindex={expr}`, dynamic
+`href`/`type`, dynamic `aria-hidden={cond}`, and a spread all resolve to
+"undecidable → silent."
+
+**Subtree detection — built.** The prompt's instinct is right (a hidden
+container with a focusable descendant is the more common bug), and the walk is
+safe: the same recursive child scan as interactive-role-required /
+control-needs-name, applying the focusability predicate, with components and
+dynamic `{expr}` children treated as `unknown` → silent. Known limitation:
+`<div aria-hidden="true">{children}</div>` (dynamic children) is silent — the
+subtree can't be seen — but that usually coincides with a dynamic `aria-hidden`
+(a toggled modal), which is silent regardless. Direct-JSX subtrees are caught.
+
+**Component path — deferred, with an option flagged.** A component with
+`aria-hidden` is out of scope: `aria-hidden`/`tabindex` usually pass through,
+but we cannot see whether they land on a focusable element inside. A future
+version *could* use the existing `role` field to infer focusability (interactive
+widget roles are focusable), but that layers a role→focusability inference on a
+forwarding assumption — a real judgment call, not a clean reuse of existing
+fields, so it is surfaced here rather than built solo. (Inside a hidden subtree,
+a component descendant is already handled conservatively as `unknown` → silent.)
+
+---
+
+## Phase 3 status: COMPLETE
+
+All planned Phase 3 lint rules are shipped: `interactive-role-required`,
+`img-needs-alt`, `idref-resolves`, `control-needs-name`, and
+`aria-hidden-not-focusable`. Together with the Phase 2 format tier
+(`no-redundant-role`, `no-unsupported-aria`, `aria-syntax-normalize`) and the
+config bridge, the MVP rule set from the plan is complete. The lint tier
+demonstrates the full range the architecture set out to cover: an
+inferred-basis rule that graduates to declared auto-fix via config
+(`interactive-role-required`), and native-basis report-only rules that stay
+lint-tier for three distinct, documented reasons (uncertain / unfixable /
+refuses-to-pick). What remains in the plan is validation-and-release (Phase 5)
+and multi-framework (Phase 6), not new MVP rules.
 
 ---
 

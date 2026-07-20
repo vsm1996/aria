@@ -90,6 +90,17 @@ lives in [CLAUDE.md](./CLAUDE.md).
   Report-only, `native` basis — same unfixable-by-machine reasoning as
   `img-needs-alt`. Config control components are checked on their declared
   `nameProp`, the third consumer of that field. Dynamic name sources → silent.
+- **`aria-hidden-not-focusable`** flags `aria-hidden="true"` on a focusable
+  element — or on a subtree that still contains one (the common modal/dropdown
+  bug) — a "focusable ghost" a keyboard user can reach but assistive tech can't
+  see (WAI-ARIA 1.2). `tabindex="-1"` correctly de-focuses it and is silent.
+  Report-only for a third distinct reason: several valid repairs exist (remove
+  `aria-hidden`, add `tabindex="-1"`, or restructure) and which is right depends
+  on intent the tool can't see — so it names them and refuses to pick.
+
+This is the full MVP rule set — **Phase 3 (the lint tier) is complete.** The
+three format rules gate CI; the five lint rules surface located, human-reviewed
+diagnostics, and config declarations graduate the relevant ones toward auto-fix.
 - **ESLint ↔ oxlint parity, enforced.** The same rule runs under oxlint's
   experimental `jsPlugins` with zero drift across every fixture — diagnostics,
   locations, and fix output — verified by `pnpm parity:oxlint` on every push
