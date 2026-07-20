@@ -7,13 +7,17 @@ tier, basis, and spec citation without reading implementation code.
 > [validation.md](./validation.md). Two real bugs were found and are flagged as
 > Known Issues below (each gets its own tested follow-up, not a drive-by fix).
 
-## Known issues (found in Phase 5 validation — pending follow-up)
+## Known issues (found in Phase 5 validation)
 
-- **`aria-hidden-not-focusable` — React `tabIndex` casing.** `isFocusable`
-  checks lowercase `tabindex`; JSX uses camelCase `tabIndex`, so the
-  spec-recommended `aria-hidden` + `tabIndex="-1"` de-focus pattern is
-  false-positive flagged. Fixable; needs a follow-up PR with fixtures in the
-  React casing. See validation.md, BUG 1.
+- **`aria-hidden-not-focusable` — React `tabIndex` casing. RESOLVED.**
+  `isFocusable` now reads camelCase `tabIndex` (JSX's casing) as well as
+  lowercase `tabindex`, so the spec-recommended `aria-hidden` +
+  `tabIndex="-1"` de-focus pattern is no longer flagged. Regression fixtures
+  use the camelCase casing. An audit confirmed no other rule had a
+  camelCase/lowercase attribute-name mismatch (`control-needs-name` already
+  handled `htmlFor`/`for`; all other checked attributes — `id`, `role`,
+  `href`, `type`, `list`, `aria-*` — are unchanged in JSX). See validation.md,
+  BUG 1.
 - **`control-needs-name` — `aria-hidden` not exempted.** An `aria-hidden="true"`
   control is out of the accessibility tree and needs no name, but the rule
   flags it anyway (inconsistent with `img-needs-alt`, which exempts it).
