@@ -33,7 +33,7 @@ export const valid: string[] = [
   // aria-controls resolves — all three attributes are checked, not just labelledby.
   '<div><section id="panel" /><button aria-controls="panel">x</button></div>',
   // aria-describedby resolves.
-  '<div><p id="hint">Help</p><input aria-describedby="hint" /></div>',
+  '<div><p id="hint">Help</p><input aria-describedby="hint" aria-label="Field" /></div>',
 
   // A literal id written as a string expression is still statically known.
   "<div><span id={'foo'} /><button aria-labelledby=\"foo\">x</button></div>",

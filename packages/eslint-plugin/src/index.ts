@@ -1,5 +1,6 @@
 import type { ESLint } from 'eslint';
 import ariaSyntaxNormalize from './rules/aria-syntax-normalize';
+import controlNeedsName from './rules/control-needs-name';
 import idrefResolves from './rules/idref-resolves';
 import imgNeedsAlt from './rules/img-needs-alt';
 import interactiveRoleRequired from './rules/interactive-role-required';
@@ -13,6 +14,7 @@ const plugin: ESLint.Plugin = {
   },
   rules: {
     'aria-syntax-normalize': ariaSyntaxNormalize,
+    'control-needs-name': controlNeedsName,
     'idref-resolves': idrefResolves,
     'img-needs-alt': imgNeedsAlt,
     'interactive-role-required': interactiveRoleRequired,
@@ -28,6 +30,7 @@ const plugin: ESLint.Plugin = {
   plugins: ['aria-a11y'],
   rules: {
     'aria-a11y/aria-syntax-normalize': 'error',
+    'aria-a11y/control-needs-name': 'warn',
     'aria-a11y/idref-resolves': 'warn',
     'aria-a11y/img-needs-alt': 'warn',
     'aria-a11y/interactive-role-required': 'warn',

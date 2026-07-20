@@ -56,7 +56,7 @@ export const valid: string[] = [
   // Natively interactive elements already convey a role. Silent.
   '<button onClick={handleClick}>x</button>',
   '<a href="/x" onClick={handleClick}>x</a>',
-  '<input onClick={handleClick} />',
+  '<input onClick={handleClick} aria-label="Field" />',
 
   // The author addressed the role — explicitly, or in a form we cannot
   // statically judge (dynamic role, spread that could carry one).

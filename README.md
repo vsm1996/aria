@@ -82,6 +82,14 @@ lives in [CLAUDE.md](./CLAUDE.md).
   component declared `role: 'img'` is checked the same way on its declared
   accessible-name prop (`nameProp`, defaulting to `alt`) — so a design system's
   `<Image altText="…">` is understood without assuming the prop is called `alt`.
+- **`control-needs-name`** flags an interactive control with no accessible name
+  — an icon-only `<button>`/`<a href>`, an unlabeled `<input>`/`<textarea>`/
+  `<select>` (WCAG 4.1.2). A name can come from text content, `aria-label`, a
+  resolving `aria-labelledby`, or (for form fields) an associated `<label>` by
+  `htmlFor`/`id` or by wrapping; a placeholder is explicitly *not* a name.
+  Report-only, `native` basis — same unfixable-by-machine reasoning as
+  `img-needs-alt`. Config control components are checked on their declared
+  `nameProp`, the third consumer of that field. Dynamic name sources → silent.
 - **ESLint ↔ oxlint parity, enforced.** The same rule runs under oxlint's
   experimental `jsPlugins` with zero drift across every fixture — diagnostics,
   locations, and fix output — verified by `pnpm parity:oxlint` on every push

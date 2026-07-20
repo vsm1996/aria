@@ -58,7 +58,7 @@ export const valid: string[] = [
 
   // Role overridden away from image: no longer an image, so alt is not this
   // rule's concern (whether it needs a NAME is control-needs-name's job).
-  '<img src="x.jpg" role="button" />',
+  '<img src="x.jpg" role="button" aria-label="Go" />',
 
   // A spread could carry alt or any signal we cannot see. Silent.
   '<img {...props} />',
