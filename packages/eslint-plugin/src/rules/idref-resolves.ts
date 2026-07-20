@@ -1,6 +1,7 @@
 import type { Rule } from 'eslint';
 import type { AriaRuleMeta } from '@aria/core';
 import { emit } from '../util/emit';
+import { resolveIdref } from '../util/file-ids';
 
 export const ruleMeta: AriaRuleMeta = {
   id: 'idref-resolves',
@@ -119,23 +120,21 @@ export const idrefResolves: Rule.RuleModule = {
       },
 
       'Program:exit'() {
-        // A dynamic id anywhere could resolve to any literal reference at
-        // runtime, so we cannot prove ANY literal reference is unresolved.
-        // Fail safe: stay silent for the whole file. (False negatives are
-        // acceptable here; a false positive on correct code is not.)
-        if (hasDynamicId) return;
-
         for (const reference of references) {
           for (const id of reference.ids) {
-            // idref matching is case-sensitive, like getElementById — so a
-            // case mismatch is a genuine non-resolution, reported like any other.
-            if (definedIds.has(id)) continue;
-            emit(context, {
-              node: reference.node as unknown as Rule.Node,
-              messageId: 'unresolvedIdref',
-              data: { attribute: reference.attribute, id },
-              basis: 'native',
-            });
+            // Shared resolution semantics (util/file-ids): only a token with no
+            // literal match AND no dynamic id to explain it is 'unresolved'. A
+            // dynamic id anywhere yields 'unknown' → fail-safe silence (a false
+            // positive on correct code is worse than a missed warning). Matching
+            // is case-sensitive, like getElementById.
+            if (resolveIdref(id, definedIds, hasDynamicId) === 'unresolved') {
+              emit(context, {
+                node: reference.node as unknown as Rule.Node,
+                messageId: 'unresolvedIdref',
+                data: { attribute: reference.attribute, id },
+                basis: 'native',
+              });
+            }
           }
         }
       },

@@ -13,6 +13,14 @@
   },
   "rules": {
     "aria-a11y/aria-syntax-normalize": "error",
+    "aria-a11y/control-needs-name": [
+      "error",
+      {
+        "componentSemantics": {
+          "IconButton": { "role": "button", "nameProp": "label", "source": "declared" }
+        }
+      }
+    ],
     "aria-a11y/idref-resolves": "error",
     "aria-a11y/img-needs-alt": [
       "error",

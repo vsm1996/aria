@@ -139,7 +139,7 @@ its section below).
 | id | status | basis | confidence band | spec citation |
 |----|--------|-------|-----------------|---------------|
 | `interactive-role-required` | SHIPPED | inferred → declared via config | intrinsic: child-inspected suggestion / report-only / silent · declared: auto-fix | WCAG 2.1 SC 4.1.2 — UI components must have a role. Non-semantic elements with event handlers need one. |
-| `control-needs-name` | CANDIDATE | inferred | 70–99% | WCAG 2.1 SC 4.1.2 — UI components must have an accessible name. Cannot author the name text — flagging only. |
+| `control-needs-name` | SHIPPED | native (report-only) · declared for the component path | 100% (in-file) | WCAG 2.1 SC 4.1.2 — UI components must have an accessible name. Cannot author the name text — flagging only. |
 | `img-needs-alt` | SHIPPED | native (report-only) | 100% (in-file) | WCAG 2.1 SC 1.1.1 — All non-decorative images need alt text. Cannot author the text — flagging only. |
 | `idref-resolves` | SHIPPED | native (report-only) | 100% (in-file) | WAI-ARIA 1.2 §7 — aria-labelledby/describedby/controls MUST reference a valid id. In-file check only. |
 | `aria-hidden-not-focusable` | CANDIDATE | native | 100% | WAI-ARIA 1.2 §6.6 — aria-hidden=true MUST NOT be applied to a focusable element. Fix is ambiguous → lint. |
@@ -354,9 +354,71 @@ Aria still cannot author the name.
 
 `nameProp` is intentionally **generic**, not img-specific: it answers "which
 prop carries this component's accessible name" for any name-aware rule.
-`img-needs-alt` is the first consumer; **`control-needs-name` is the next
-planned consumer** and will read the same field the same way for non-image
-interactive components — no re-touching required.
+`img-needs-alt` is the first consumer; **`control-needs-name` is the second**
+(shipped), reading the same field the same way for non-image interactive
+components — no re-touching required.
+
+### `control-needs-name` — the scope boundaries and the name checks
+
+Flags an interactive control with no accessible name (WCAG 4.1.2).
+Report-only — Aria cannot author label text. Basis/tier is the *same*
+decoupling as img-needs-alt: `native` fact, lint tier because
+unfixable-by-machine (not because uncertain). The config-component path emits
+`declared` (config ground truth) and is still report-only.
+
+**Element scope (v1, deliberately tight):**
+
+- **Named by content or ARIA:** `<button>`, `<a href>`, and anything the
+  shared resolver calls role `button` or `link` (so explicit `role="button"`
+  on a div, etc.). Name from subtree text, `aria-label`, or a resolving
+  `aria-labelledby`.
+- **Named by a label or ARIA (never by content, never by placeholder):**
+  `<input>` whose role is `textbox`/`searchbox`/`checkbox`/`radio`,
+  `<textarea>`, and `<select>`. (`<select>` resolves to `null` in the shared
+  resolver, so it is gated by tag, not role.)
+- **Out of scope, flagged for a later decision rather than silently added:**
+  `<input type="number">` (spinbutton) and `type="range"` (slider) — they need
+  names and are the same shape, but sit outside the prompt's explicit list;
+  `<input>` button-types (submit/reset/button/image) — role `button` but named
+  by the `value`/`alt` attribute, a different mechanism; and every other ARIA
+  widget role (tab, menuitem, switch, …). These are real future scope.
+
+**What counts as a name** (any one silences; a *dynamic* form of any of them
+means "can't determine" → silent, never flagged):
+
+- Visible text anywhere in the subtree (content controls only).
+- `aria-label` — a **non-empty literal** string. `aria-label=""` is not a name.
+- `aria-labelledby` — supplies a name only if at least one token **resolves to
+  an in-file id**. This reuses idref-resolves's resolution semantics via the
+  shared `util/file-ids.resolveIdref` (idref-resolves was refactored onto the
+  same helper). An unresolved labelledby supplies no name (that's
+  idref-resolves's bug to report, not a name here); a dynamic id anywhere makes
+  it "could resolve at runtime" → silent.
+- For form controls: an associated `<label>`, **via `htmlFor`/`id` match
+  (in-file) OR by a literal `<label>` ancestor wrapping the control.**
+
+**Placeholder is NOT a name** — it disappears on input and fails WCAG in most
+interpretations. `<input placeholder="Search">` with no other name is flagged.
+
+**Two boundary calls, flagged for the record:**
+
+1. **Implicit label wrapping is handled** (a literal `<label>` ancestor
+   silences the control) — beyond the prompt's literal "htmlFor/id" spec, but
+   omitting it would false-positive the extremely common
+   `<label>Name <input/></label>` pattern. Conservative: the ancestor `<label>`
+   silences without inspecting its text (false-negative-safe).
+2. **Component ancestors are NOT assumed to render a label.** A raw `<input>`
+   inside a label-rendering *component* (`<Field><input/></Field>`) with no
+   visible label or ARIA IS flagged — component internals are invisible, the
+   same principle as everywhere. The fix is `aria-label`, an explicit
+   `<label>`, or declaring the *component* (not the raw input) via config.
+
+**Component path** mirrors img-needs-alt: a config entry whose `role` is a
+control role (button/link/textbox/…) and whose `resolveNameProp` yields a prop
+is checked for that prop (present non-empty → silent, absent/empty → flagged,
+dynamic → silent), plus the same ARIA/content checks on the usage. A `role:
+'img'` component, or one with no resolvable name prop, stays silent (not this
+rule's concern). Basis `declared`, report-only.
 
 ---
 
@@ -366,11 +428,13 @@ A rule moves from lint to format when config supplies ground truth for the detec
 The mechanism: `componentSemantics` in aria.config.ts changes `basis: inferred` to
 `basis: declared`, which the `emit` helper translates to an auto-applied `fix`.
 
-**Config bridge status: live — two consumers.** `interactive-role-required`
-reads `role` (component name match → declared basis → an auto-applied fix
-inserting the declared role). `img-needs-alt` reads `role: 'img'` plus the
-accessible-name prop via `resolveNameProp` (declared basis, report-only). Both
-stay silent without a match.
+**Config bridge status: live — three consumers.**
+`interactive-role-required` reads `role` (component name match → declared basis
+→ an auto-applied fix inserting the declared role). `img-needs-alt` and
+`control-needs-name` read `role` plus the accessible-name prop via
+`resolveNameProp` (declared basis, report-only) — img-needs-alt for `role:
+'img'`, control-needs-name for control roles (button/link/textbox/…). All stay
+silent without a match.
 
 **`ComponentSemantic` schema fields:** `role` (the ARIA role the component
 renders as), `requiresName?` (boolean; declared but not yet consumed),

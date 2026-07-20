@@ -126,14 +126,14 @@ export const invalid: InvalidFixture[] = [
   },
   // Tristate value casing.
   {
-    code: '<input type="checkbox" aria-checked="MIXED" />',
+    code: '<input type="checkbox" aria-checked="MIXED" aria-label="agree" />',
     errors: [
       {
         messageId: 'valueCase',
         data: { attribute: 'aria-checked', value: 'MIXED', normalized: 'mixed' },
       },
     ],
-    output: '<input type="checkbox" aria-checked="mixed" />',
+    output: '<input type="checkbox" aria-checked="mixed" aria-label="agree" />',
   },
   // Name and value both wrong: two discrete diagnostics, two disjoint fixes
   // (name range vs. value range), both applied in a single pass.
