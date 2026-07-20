@@ -140,12 +140,13 @@ its section below).
 |----|--------|-------|-----------------|---------------|
 | `interactive-role-required` | SHIPPED | inferred → declared via config | intrinsic: child-inspected suggestion / report-only / silent · declared: auto-fix | WCAG 2.1 SC 4.1.2 — UI components must have a role. Non-semantic elements with event handlers need one. |
 | `control-needs-name` | CANDIDATE | inferred | 70–99% | WCAG 2.1 SC 4.1.2 — UI components must have an accessible name. Cannot author the name text — flagging only. |
-| `img-needs-alt` | CANDIDATE | native* | 100% | WCAG 2.1 SC 1.1.1 — All non-decorative images need alt text. Cannot author the text — flagging only. |
+| `img-needs-alt` | SHIPPED | native (report-only) | 100% (in-file) | WCAG 2.1 SC 1.1.1 — All non-decorative images need alt text. Cannot author the text — flagging only. |
 | `idref-resolves` | SHIPPED | native (report-only) | 100% (in-file) | WAI-ARIA 1.2 §7 — aria-labelledby/describedby/controls MUST reference a valid id. In-file check only. |
 | `aria-hidden-not-focusable` | CANDIDATE | native | 100% | WAI-ARIA 1.2 §6.6 — aria-hidden=true MUST NOT be applied to a focusable element. Fix is ambiguous → lint. |
 
 *`img-needs-alt` has native basis for the detection (the img tag is known), but
-the fix would author alt text (an asserted value), so it stays lint-tier.
+the fix would author alt text (an asserted value), so it stays lint-tier — see
+its section below for the full basis/tier reasoning.
 
 ### `interactive-role-required` — confidence policy and bridge wiring
 
@@ -287,6 +288,70 @@ to a first version. The door is left open at a *high* bar for later — exact
 case-insensitive match with exactly one candidate id, correcting the
 *reference* token to match an existing element (never inventing an id, never
 Levenshtein guessing). No fuzzy matching.
+
+### `img-needs-alt` — decorative detection and a schema gap
+
+Flags an intrinsic `<img>` that is exposed as an image but has no accessible
+name and no decorative signal (WCAG 1.1.1). Report-only — Aria never authors
+the alt text.
+
+**Basis/tier — native fact, lint tier, but NOT idref-resolves's reason.** The
+detection is a `native` fact (the img's own attributes are read directly).
+Unlike idref-resolves there is *no* cross-file ambiguity: an image's
+accessible name can come only from its own attributes or a locally-present
+`aria-labelledby` attribute, so a nameless `<img>` is a clear-cut violation,
+not a "maybe fine elsewhere" case. It is still lint-tier / report-only for a
+different reason: the only repair is authoring alt text, which is a hard
+non-goal ("Aria will not invent label text, alt copy, or descriptions"). So
+two native-basis lint-tier rules now exist for two distinct reasons —
+idref-resolves is *uncertain-if-broken* (advisory), img-needs-alt is
+*certainly-broken-but-unfixable-by-machine* (flag-only). Surfaced as `warn`;
+a team may raise it to `error` (there is no false-positive-driven reason to
+soften it, unlike idref-resolves).
+
+**What silences the flag (an img is fine when any hold), evaluated
+conservatively — presence, dynamic value, or spread all silence:**
+
+- **A name mechanism:** `alt` in any form (`alt="text"` is a name; `alt=""` is
+  the spec-correct decorative marker; `alt={expr}` is unevaluable → silent),
+  `aria-label`, or `aria-labelledby`. Beyond the plan's alt+role list on
+  purpose: flagging `<img aria-label="Logo">` as needing alt would be a false
+  positive. Presence of the *attribute* is always in-file-visible, so this
+  stays a pure in-file check (whether an `aria-labelledby` target resolves is
+  idref-resolves's job, not this rule's).
+- **A decorative / non-image role:** `role="presentation"` or `role="none"`
+  (decorative); a dynamic `role={…}` (could be decorative → silent); or any
+  other explicit role (the element is no longer exposed as an image, so alt is
+  out of scope — whether it needs a *name* is control-needs-name's concern).
+  Only an implicit img or explicit `role="img"` stays in scope.
+- **Hidden from assistive tech:** `aria-hidden` present and not literal
+  `"false"` (boolean shorthand and dynamic values count as hidden → silent).
+- **A spread** (`<img {...props} />`) — could carry any of the above.
+
+**Deliberately NOT accepted:** `title`. It is a discouraged, unreliable name
+source (not surfaced to touch/keyboard users); an `<img title="…">` with no
+alt is still flagged, matching jsx-a11y.
+
+**Scope for v1:** the `<img>` tag only. `role="img"` on a *non-img* element
+(`<div role="img">`) is a related case — it needs an accessible *name*, not
+`alt` specifically — and is left to control-needs-name / a later pass.
+Components are silent (see the schema gap below).
+
+**Config bridge — NOT extended; a schema gap is flagged for a decision.** The
+plan wants a config-declared image-equivalent component checked like intrinsic
+`<img>`. `ComponentSemantic` can say a component *is* an image (`role: 'img'`)
+but has no field naming its **alt-equivalent prop**, which may not be `alt`
+(`altText`, `label`, …). Assuming `alt` would false-positive any design system
+using a different prop name — so the config path is deliberately unbuilt, and
+extending `@aria/config`'s schema is held for an explicit decision (a schema
+change affects every future config-reading rule). Proposed minimal extension
+for that decision: an optional `nameProp?: string` on `ComponentSemantic`
+(default `'alt'` when `role: 'img'`), so a component's accessible-name prop can
+be declared. Until then, config components are silent, same as an unknown one.
+
+---
+
+## Graduation queue (lint → format on declared basis)
 
 A rule moves from lint to format when config supplies ground truth for the detection.
 The mechanism: `componentSemantics` in aria.config.ts changes `basis: inferred` to
