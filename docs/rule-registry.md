@@ -161,12 +161,17 @@ semantics (`<h1 onClick>`), and undecidable ancestor-dependent roles.
 not merely the presence of `onClick`, and sorts into three outcomes:
 
 - **Confident → a `role="button"` SUGGESTION** (never an auto-fix; see the
-  gate note below) in two narrow, defensible shapes: (1) *icon-only* — no
-  text anywhere in the subtree and exactly one non-interactive intrinsic
-  element child (`<svg>`, `<i>`, `<img>`); (2) a *single short action-like
-  text child* and no element children (`<div onClick>Save</div>`). The
-  label bar is deliberately minimal — one text child, trimmed, ≤ 3 words —
-  not a verb dictionary.
+  gate note below) in three narrow, defensible shapes — with nothing else in
+  the subtree (no dynamic `{expression}` or fragment children): (1) *icon-only*
+  — no text anywhere in the subtree and exactly one non-interactive intrinsic
+  element child (`<svg>`, `<i>`, `<img>`); (2) *short-text-only* — a single
+  short action-like text child and no element children (`<div onClick>Save</div>`);
+  (3) *icon + short text* — one such element child AND one such short text
+  child (`<div onClick><svg/>Save</div>`), the most button-like shape of all, a
+  labelled icon button (order-agnostic). The label bar is deliberately minimal
+  — one text child, trimmed, ≤ 3 words — not a verb dictionary. The bucket
+  stays narrow: a long text alongside an icon, or more than one element child
+  next to the text, falls to report-only.
 - **Silent → report nothing** when the element *contains a nested
   interactive element* (a native control, an element with a widget role per
   aria-query's superclass chain, or another generic-with-onClick). That is a
@@ -187,13 +192,13 @@ not merely the presence of `onClick`, and sorts into three outcomes:
   context (is it inside `role="menu"`?) that is a candidate for a *future*
   rule, not this one.
 
-**Two deliberate conservatism calls, flagged for the record:** an icon that
-is a *component* (`<div onClick><Icon/></div>`) is report-only, not a
-confident suggestion, because the resolver cannot confirm the component is
-non-interactive; and an *icon+text* labeled button
-(`<div onClick><svg/>Save</div>`) is report-only, because it matches neither
-narrow confident shape (it has both an element and text). Both err toward
-report-only rather than a guess.
+**Deliberate conservatism call, flagged for the record:** an icon that is a
+*component* (`<div onClick><Icon/></div>`) is report-only, not a confident
+suggestion, because the resolver cannot confirm the component is
+non-interactive (it may itself render a `<button>`) — it errs toward
+report-only rather than a guess. (An earlier revision also treated an
+*icon+text* labelled button as report-only; that is now resolved — it is a
+confident suggestion, shape (3) above.)
 
 **The gate, not a convention, is why confidence never buys an auto-fix.**
 Every intrinsic diagnostic is `basis: inferred`. `emit` maps inferred to a
