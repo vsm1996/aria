@@ -5,7 +5,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { AriaConfigError, validateAriaConfig } from './validate';
 import { resolveComponentSemantic } from './resolve';
 import { clearAriaConfigCache, loadAriaConfig } from './loader';
-import type { AriaConfig } from './index';
+import { resolveNameProp, type AriaConfig } from './index';
 
 const SEMANTIC = { role: 'button', requiresName: true, source: 'declared' as const };
 
@@ -39,6 +39,26 @@ describe('resolveComponentSemantic (pure)', () => {
   });
 });
 
+describe('resolveNameProp (pure)', () => {
+  it('returns an explicit nameProp verbatim', () => {
+    expect(resolveNameProp({ role: 'img', nameProp: 'altText', source: 'declared' })).toBe(
+      'altText',
+    );
+    // Explicit nameProp wins even for a non-image role.
+    expect(resolveNameProp({ role: 'button', nameProp: 'label', source: 'declared' })).toBe(
+      'label',
+    );
+  });
+
+  it("defaults to 'alt' for an image role with no nameProp", () => {
+    expect(resolveNameProp({ role: 'img', source: 'declared' })).toBe('alt');
+  });
+
+  it('is undefined for a non-image role with no nameProp (no name-checking basis)', () => {
+    expect(resolveNameProp({ role: 'button', source: 'declared' })).toBeUndefined();
+  });
+});
+
 describe('validateAriaConfig (pure)', () => {
   it('rejects unknown top-level keys (typos must be loud)', () => {
     expect(() => validateAriaConfig({ componentSemantic: {} }, 'x')).toThrow(AriaConfigError);
@@ -55,6 +75,27 @@ describe('validateAriaConfig (pure)', () => {
     expect(() =>
       validateAriaConfig({ componentSemantics: { A: { role: 'button', requireName: true } } }, 'x'),
     ).toThrow(/unknown key "requireName"/);
+  });
+
+  it('accepts nameProp as a valid key and carries it through', () => {
+    const config = validateAriaConfig(
+      { componentSemantics: { A: { role: 'img', nameProp: 'altText' } } },
+      'x',
+    );
+    expect(config.componentSemantics?.['A']).toEqual({
+      role: 'img',
+      nameProp: 'altText',
+      source: 'declared',
+    });
+  });
+
+  it('rejects a non-string or empty nameProp (same strictness as every field)', () => {
+    expect(() =>
+      validateAriaConfig({ componentSemantics: { A: { role: 'img', nameProp: 42 } } }, 'x'),
+    ).toThrow(/nameProp must be a non-empty string/);
+    expect(() =>
+      validateAriaConfig({ componentSemantics: { A: { role: 'img', nameProp: '' } } }, 'x'),
+    ).toThrow(/nameProp must be a non-empty string/);
   });
 
   it("normalizes an omitted source to 'declared' and rejects any other value", () => {

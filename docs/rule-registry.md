@@ -332,22 +332,31 @@ conservatively — presence, dynamic value, or spread all silence:**
 source (not surfaced to touch/keyboard users); an `<img title="…">` with no
 alt is still flagged, matching jsx-a11y.
 
-**Scope for v1:** the `<img>` tag only. `role="img"` on a *non-img* element
-(`<div role="img">`) is a related case — it needs an accessible *name*, not
-`alt` specifically — and is left to control-needs-name / a later pass.
-Components are silent (see the schema gap below).
+**Scope for intrinsic detection:** the `<img>` tag only. `role="img"` on a
+*non-img* element (`<div role="img">`) is a related case — it needs an
+accessible *name*, not `alt` specifically — and is left to control-needs-name
+/ a later pass.
 
-**Config bridge — NOT extended; a schema gap is flagged for a decision.** The
-plan wants a config-declared image-equivalent component checked like intrinsic
-`<img>`. `ComponentSemantic` can say a component *is* an image (`role: 'img'`)
-but has no field naming its **alt-equivalent prop**, which may not be `alt`
-(`altText`, `label`, …). Assuming `alt` would false-positive any design system
-using a different prop name — so the config path is deliberately unbuilt, and
-extending `@aria/config`'s schema is held for an explicit decision (a schema
-change affects every future config-reading rule). Proposed minimal extension
-for that decision: an optional `nameProp?: string` on `ComponentSemantic`
-(default `'alt'` when `role: 'img'`), so a component's accessible-name prop can
-be declared. Until then, config components are silent, same as an unknown one.
+**Config bridge — LIVE, via the generic `nameProp` field.** A component
+declared as an image (`role: 'img'`) is checked exactly like intrinsic
+`<img>`, but on its declared accessible-name prop instead of hardcoded `alt`.
+The prop comes from `resolveNameProp(semantic)` in `@aria/config`: an explicit
+`nameProp` wins, else `'alt'` is the default for `role: 'img'`, else undefined
+(no name-checking basis → silent). So `{ MyImage: { role: 'img', nameProp:
+'altText' } }` makes `<MyImage/>` with no `altText` flagged, `altText=""`
+decorative-silent, `altText={x}` dynamic-silent — the same
+decorative/dynamic/aria-label exceptions as the intrinsic path, applied to the
+named prop. `{ Logo: { role: 'img' } }` (no `nameProp`) defaults to checking
+`alt`. No matching config, or a non-image declaration, stays silent. The
+component-path diagnostic carries basis `declared` (the image-ness is config
+ground truth) and is still report-only — declared basis does not imply a fix;
+Aria still cannot author the name.
+
+`nameProp` is intentionally **generic**, not img-specific: it answers "which
+prop carries this component's accessible name" for any name-aware rule.
+`img-needs-alt` is the first consumer; **`control-needs-name` is the next
+planned consumer** and will read the same field the same way for non-image
+interactive components — no re-touching required.
 
 ---
 
@@ -357,13 +366,22 @@ A rule moves from lint to format when config supplies ground truth for the detec
 The mechanism: `componentSemantics` in aria.config.ts changes `basis: inferred` to
 `basis: declared`, which the `emit` helper translates to an auto-applied `fix`.
 
-**Config bridge status: live — consumed by `interactive-role-required`**
-(component name match in `componentSemantics` → declared basis → an
-auto-applied fix inserting the declared role; without config that component
-is silent, while an intrinsic element is handled by the child-inspection
-policy — suggestion, report-only, or silent; see that rule's section above).
-Originally built and tested standalone:
-`@aria/config` now ships the full mechanism: `loadAriaConfig(searchFrom)`
+**Config bridge status: live — two consumers.** `interactive-role-required`
+reads `role` (component name match → declared basis → an auto-applied fix
+inserting the declared role). `img-needs-alt` reads `role: 'img'` plus the
+accessible-name prop via `resolveNameProp` (declared basis, report-only). Both
+stay silent without a match.
+
+**`ComponentSemantic` schema fields:** `role` (the ARIA role the component
+renders as), `requiresName?` (boolean; declared but not yet consumed),
+`nameProp?` (the prop that carries the accessible name — generic across
+name-aware rules; consumed by `img-needs-alt`, next by `control-needs-name`;
+`resolveNameProp` defaults it to `'alt'` when `role: 'img'`), and `source`
+(always `'declared'`, normalized in). Validation rejects unknown keys and
+non-conforming values loudly; a non-string/empty `nameProp` is rejected like
+every other field.
+
+`@aria/config` ships the full mechanism: `loadAriaConfig(searchFrom)`
 (cosmiconfig, upward search to the filesystem root over
 `aria.config.{ts,js,cjs,json}` / `.ariarc(.json)`; "no config" is a
 first-class `null` result, a malformed or schema-invalid config throws
@@ -375,9 +393,8 @@ per-process with per-directory search results plus a validation memo, so
 repeated loads return the same object and nothing hits the filesystem per
 node visit; `clearAriaConfigCache()` exists for tests and long-lived
 servers. The loader is the config package's single sanctioned I/O surface —
-rule logic receives a loaded config and calls only the pure resolver. No
-rule consumes this yet; wiring it into the first lint rule is deliberately a
-separate change.
+rule logic receives a loaded config and calls only the pure resolvers
+(`resolveComponentSemantic`, `resolveNameProp`).
 
 | rule | graduates when |
 |------|---------------|

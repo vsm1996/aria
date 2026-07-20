@@ -1,6 +1,8 @@
 import type { Rule } from 'eslint';
 import type { AriaRuleMeta } from '@aria/core';
+import { resolveComponentSemantic, resolveNameProp } from '@aria/config';
 import { emit } from '../util/emit';
+import { configForRule } from '../util/load-config';
 import {
   getAttrState,
   hasSpreadAttribute,
@@ -28,10 +30,16 @@ export const ruleMeta: AriaRuleMeta = {
   // the gap and hands the words to a human. It is lint-tier because it is
   // unfixable-by-machine, not because it is uncertain. Surfaced as `warn`,
   // matching the plan's listing of img-needs-alt as native in the lint tier.
+  //
+  // The config path (a declared image-equivalent component) emits basis
+  // 'declared' instead — the component's image-ness is config ground truth,
+  // not native HTML — but it is still report-only, since Aria still cannot
+  // author the name. (Declared basis does not imply an auto-fix; it means
+  // known semantics, which here remain unfixable-by-machine.)
   tier: 'lint',
   basis: 'native',
   description:
-    'Flag an <img> exposed as an image that has no accessible name and no decorative signal.',
+    'Flag an <img> (or a declared image-equivalent component) that has no accessible name and no decorative signal.',
   specBasis:
     'WCAG 2.1 SC 1.1.1 (Non-text Content): images must have a text alternative. An empty alt="" or role="presentation"/"none" is the valid way to mark an image decorative.',
 };
@@ -39,6 +47,51 @@ export const ruleMeta: AriaRuleMeta = {
 /** Is the attribute present in any form (literal, dynamic, or shorthand)? */
 function isPresent(node: JSXOpeningElementNode, name: string, hasSpread: boolean): boolean {
   return getAttrState(node, name, hasSpread).presence !== 'absent';
+}
+
+/**
+ * Does this usage carry a name, a decorative signal, or a "not exposed as an
+ * image" signal — anything that makes the missing name a non-issue? Shared by
+ * the intrinsic `<img>` path (nameProp = 'alt') and the declared-component
+ * path (nameProp = the component's declared accessible-name prop). Evaluated
+ * conservatively: a present, dynamic, or spread-supplied signal all silence.
+ */
+function hasNameOrDecorativeSignal(
+  node: JSXOpeningElementNode,
+  hasSpread: boolean,
+  nameProp: string,
+): boolean {
+  // A spread could carry any of the signals below.
+  if (hasSpread) return true;
+
+  // Accessible-name mechanisms (any form counts): the name prop itself
+  // (empty = decorative, non-empty = a name, dynamic = unevaluable), or ARIA.
+  if (isPresent(node, nameProp, hasSpread)) return true;
+  if (isPresent(node, 'aria-label', hasSpread)) return true;
+  if (isPresent(node, 'aria-labelledby', hasSpread)) return true;
+
+  // Role override: presentation/none are decorative; a dynamic role could be
+  // either; any other explicit role means it is no longer exposed as an image
+  // (alt is then out of scope). Only an absent role or explicit role="img"
+  // stays in scope.
+  const roleState = getAttrState(node, 'role', hasSpread);
+  if (roleState.presence === 'unknown') return true;
+  if (roleState.presence === 'present') {
+    if (roleState.value === null) return true; // non-string role value — cannot judge
+    if (roleState.value.trim().toLowerCase() !== 'img') return true;
+  }
+
+  // aria-hidden removes the element from the accessibility tree, so it needs
+  // no name — UNLESS it is explicitly "false" (a dynamic value could be true).
+  const hiddenState = getAttrState(node, 'aria-hidden', hasSpread);
+  if (hiddenState.presence === 'unknown') return true;
+  if (hiddenState.presence === 'present') {
+    if (hiddenState.value === null || hiddenState.value.trim().toLowerCase() !== 'false') {
+      return true;
+    }
+  }
+
+  return false;
 }
 
 export const imgNeedsAlt: Rule.RuleModule = {
@@ -50,62 +103,60 @@ export const imgNeedsAlt: Rule.RuleModule = {
     messages: {
       imgNeedsAlt:
         '<img> has no alt attribute and no accessible name or decorative signal, so assistive technology cannot convey it (img-needs-alt; WCAG 2.1 SC 1.1.1). Add alt text describing the image, alt="" if it is purely decorative, or role="presentation". Aria cannot write the text for you.',
+      componentImgNeedsAlt:
+        '<{{component}}> is declared as an image (componentSemantics) but has no accessible name: its "{{prop}}" prop is absent and there is no decorative signal (img-needs-alt; WCAG 2.1 SC 1.1.1). Set {{prop}} to a description, or {{prop}}="" if it is decorative. Aria cannot write the text for you.',
     },
-    schema: [],
+    schema: [
+      {
+        type: 'object',
+        properties: {
+          componentSemantics: { type: 'object' },
+          ignore: { type: 'array' },
+        },
+        additionalProperties: false,
+      },
+    ],
   },
 
   create(context) {
+    const config = configForRule(context);
+
     return {
       JSXOpeningElement(esNode: Rule.Node) {
         const node = esNode as unknown as JSXOpeningElementNode;
 
-        // Intrinsic <img> only. Components (e.g. <Image />) render opaque
-        // internals — silent by default, and the config bridge cannot resolve
-        // their alt-equivalent prop yet (schema gap; see docs/rule-registry.md).
-        if (intrinsicTag(node) !== 'img') return;
+        // Intrinsic <img>: the accessible-name prop is always `alt`.
+        if (intrinsicTag(node) === 'img') {
+          const hasSpread = hasSpreadAttribute(node);
+          if (!hasNameOrDecorativeSignal(node, hasSpread, 'alt')) {
+            emit(context, { node: esNode, messageId: 'imgNeedsAlt', basis: 'native' });
+          }
+          return;
+        }
+
+        // Config bridge: a component declared as an image-equivalent. Its
+        // accessible-name prop comes from config (resolveNameProp: an explicit
+        // `nameProp`, else `alt` for a `role: 'img'` entry). No matching
+        // config, or a non-image declaration, stays silent.
+        if (node.name.type !== 'JSXIdentifier' || node.name.name === undefined) return;
+        const name = node.name.name;
+        const isComponent = name[0] !== undefined && name[0] !== name[0].toLowerCase();
+        if (!isComponent) return; // other intrinsic tags are not this rule's concern
+
+        const semantic = resolveComponentSemantic(config, name);
+        if (semantic === undefined || semantic.role !== 'img') return;
+        const nameProp = resolveNameProp(semantic);
+        if (nameProp === undefined) return; // defensive: role 'img' always yields one
 
         const hasSpread = hasSpreadAttribute(node);
-        // A spread could supply alt or any decorative/name signal we can't see.
-        if (hasSpread) return;
-
-        // Any accessible-name mechanism present → the author addressed naming.
-        // `alt` in ANY form counts: alt="" is a deliberate decorative marker,
-        // alt="text" is a name, alt={expr} is unevaluable (don't guess).
-        if (isPresent(node, 'alt', hasSpread)) return;
-        if (isPresent(node, 'aria-label', hasSpread)) return;
-        if (isPresent(node, 'aria-labelledby', hasSpread)) return;
-
-        // Role override: presentation/none are decorative (silent); a dynamic
-        // role could be either (silent); any other explicit role means the
-        // element is no longer exposed as an image, so alt is not this rule's
-        // concern (silent). Only an implicit img, or an explicit role="img",
-        // remains in scope.
-        const roleState = getAttrState(node, 'role', hasSpread);
-        if (roleState.presence === 'unknown') return;
-        if (roleState.presence === 'present') {
-          if (roleState.value === null) return; // non-string role value — cannot judge
-          if (roleState.value.trim().toLowerCase() !== 'img') return;
+        if (!hasNameOrDecorativeSignal(node, hasSpread, nameProp)) {
+          emit(context, {
+            node: esNode,
+            messageId: 'componentImgNeedsAlt',
+            data: { component: name, prop: nameProp },
+            basis: 'declared',
+          });
         }
-
-        // aria-hidden removes the element from the accessibility tree, so it
-        // needs no name — UNLESS it is explicitly "false". A dynamic value
-        // could be true, so stay silent on it.
-        const hiddenState = getAttrState(node, 'aria-hidden', hasSpread);
-        if (hiddenState.presence === 'unknown') return;
-        if (hiddenState.presence === 'present') {
-          // Boolean shorthand (`aria-hidden`) or "true" → hidden. Only literal
-          // "false" leaves the image exposed.
-          if (hiddenState.value === null || hiddenState.value.trim().toLowerCase() !== 'false') {
-            return;
-          }
-        }
-
-        // An image exposed as an image with no name and no decorative signal.
-        emit(context, {
-          node: esNode,
-          messageId: 'imgNeedsAlt',
-          basis: 'native',
-        });
       },
     };
   },

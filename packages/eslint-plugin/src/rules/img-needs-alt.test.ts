@@ -1,7 +1,7 @@
 import { RuleTester } from 'eslint';
 import { describe, it } from 'vitest';
 import imgNeedsAlt from './img-needs-alt';
-import { invalid, valid } from './img-needs-alt.fixtures';
+import { invalid, ruleOptions, valid } from './img-needs-alt.fixtures';
 
 /**
  * The canonical suite for img-needs-alt. The cases live in
@@ -18,6 +18,9 @@ const tester = new RuleTester({
 
 describe('img-needs-alt', () => {
   it('passes RuleTester', () => {
-    tester.run('img-needs-alt', imgNeedsAlt, { valid: [...valid], invalid });
+    tester.run('img-needs-alt', imgNeedsAlt, {
+      valid: valid.map((code) => ({ code, options: ruleOptions })),
+      invalid: invalid.map((fixture) => ({ ...fixture, options: ruleOptions })),
+    });
   });
 });

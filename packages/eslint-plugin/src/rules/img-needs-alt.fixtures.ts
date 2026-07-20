@@ -18,9 +18,24 @@
 
 export interface InvalidFixture {
   code: string;
-  errors: { messageId: string }[];
+  errors: { messageId: string; data?: Record<string, string> }[];
   output: string | null;
 }
+
+/**
+ * Rule options shared by every consumer of these fixtures (mirrored verbatim
+ * in .oxlintrc.json — the parity harness fails on drift). MyImage exercises
+ * the config bridge with a NON-`alt` name prop (`altText`), Logo exercises the
+ * `alt` default for a `role: 'img'` entry with no declared nameProp.
+ */
+export const ruleOptions: unknown[] = [
+  {
+    componentSemantics: {
+      MyImage: { role: 'img', nameProp: 'altText', source: 'declared' },
+      Logo: { role: 'img', source: 'declared' },
+    },
+  },
+];
 
 export const valid: string[] = [
   // Empty alt — the spec-correct way to mark an image decorative. NOT missing.
@@ -53,6 +68,18 @@ export const valid: string[] = [
 
   // Not an image at all.
   '<div>caption</div>',
+
+  // ---- Config bridge: declared image components. ----
+  // MyImage's declared name prop is `altText`. Present → named → silent.
+  '<MyImage src="x.jpg" altText="a cat" />',
+  // Empty declared name prop → decorative, exactly like intrinsic alt="".
+  '<MyImage src="x.jpg" altText="" />',
+  // Dynamic declared name prop → unevaluable → silent.
+  '<MyImage src="x.jpg" altText={caption} />',
+  // Logo has no declared nameProp but role: 'img' → defaults to `alt`; present.
+  '<Logo alt="Acme" />',
+  // A named/decorative component via ARIA still silences.
+  '<MyImage src="x.jpg" aria-label="a cat" />',
 ];
 
 export const invalid: InvalidFixture[] = [
@@ -74,6 +101,24 @@ export const invalid: InvalidFixture[] = [
   {
     code: '<img src="x.jpg" title="Company logo" />',
     errors: [{ messageId: 'imgNeedsAlt' }],
+    output: null,
+  },
+
+  // ---- Config bridge: declared image component missing its name prop. ----
+  // MyImage declared with nameProp `altText`, used without it → flagged, and
+  // the message names the actual prop, not a hardcoded `alt`.
+  {
+    code: '<MyImage src="x.jpg" />',
+    errors: [
+      { messageId: 'componentImgNeedsAlt', data: { component: 'MyImage', prop: 'altText' } },
+    ],
+    output: null,
+  },
+  // Logo has role: 'img' and no declared nameProp → defaults to checking
+  // `alt`; used without it → flagged.
+  {
+    code: '<Logo src="x.jpg" />',
+    errors: [{ messageId: 'componentImgNeedsAlt', data: { component: 'Logo', prop: 'alt' } }],
     output: null,
   },
 ];

@@ -14,7 +14,15 @@
   "rules": {
     "aria-a11y/aria-syntax-normalize": "error",
     "aria-a11y/idref-resolves": "error",
-    "aria-a11y/img-needs-alt": "error",
+    "aria-a11y/img-needs-alt": [
+      "error",
+      {
+        "componentSemantics": {
+          "MyImage": { "role": "img", "nameProp": "altText", "source": "declared" },
+          "Logo": { "role": "img", "source": "declared" }
+        }
+      }
+    ],
     // interactive-role-required's options MUST mirror `ruleOptions` in its
     // fixtures module — the parity harness verifies this and fails on drift.
     // The DeclaredButton entry exists to exercise the config bridge
