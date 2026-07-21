@@ -1,0 +1,31 @@
+{
+  "name": "@aria/cli",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Zero-config standalone CLI for Aria's accessibility rules — aria check / aria fix, no ESLint config required.",
+  "bin": {
+    "aria": "./dist/cli.js"
+  },
+  "main": "./src/cli.ts",
+  "exports": {
+    ".": "./src/runner.ts"
+  },
+  "scripts": {
+    "build": "tsup",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@babel/core": "^7.29.0",
+    "@babel/eslint-parser": "^7.29.0",
+    "@babel/preset-react": "^7.27.0",
+    "@babel/preset-typescript": "^7.27.0",
+    "aria-query": "^5.3.2",
+    "cosmiconfig": "^9.0.0",
+    "eslint": "^9.13.0",
+    "eslint-plugin-aria-a11y": "workspace:*"
+  },
+  "devDependencies": {
+    "tsup": "^8.3.0"
+  }
+}
