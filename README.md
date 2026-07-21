@@ -116,15 +116,32 @@ there that isn't tested and CI-gated here.
 
 ## Using it
 
-Two surfaces, one rule set. **Not yet published to npm** (publish prep is done;
-see below), so today you run from a clone — but the shapes are final.
+Two surfaces, one rule set — **both live on npm** at `0.1.1`.
+
+### `eslint-plugin-aria-a11y` — the plugin
+
+```sh
+npm install --save-dev eslint eslint-plugin-aria-a11y
+```
+
+Standard flat-config plugin; also runs under oxlint via `jsPlugins` unchanged.
+This repo's [.oxlintrc.json](./.oxlintrc.json) is a working example.
+
+```js
+// eslint.config.js
+import aria from 'eslint-plugin-aria-a11y';
+
+export default [
+  { plugins: { 'aria-a11y': aria }, rules: aria.configs.recommended.rules },
+];
+```
 
 ### `@aria-a11y/cli` — the zero-config CLI
 
 ```sh
-aria check [paths]   # report a11y diagnostics (both tiers); exits nonzero on
-                     # any format-tier issue — the CI teeth
-aria fix   [paths]   # apply format-tier (safe, meaning-preserving) fixes only
+npx @aria-a11y/cli check [paths]   # report a11y diagnostics (both tiers);
+                                   # exits nonzero on any format-tier issue — the CI teeth
+npx @aria-a11y/cli fix   [paths]   # apply format-tier (safe, meaning-preserving) fixes only
 ```
 
 **Zero-config** means exactly that: no ESLint config file, no host setup — point
@@ -140,18 +157,18 @@ to ESLint by construction (a parity test asserts it against the same fixtures).
 It is "standalone" in the sense that matters — no ESLint config, no host — not a
 claim of zero ESLint code inside.
 
-### `eslint-plugin-aria-a11y` — the plugin
+> **Version note:** start at **0.1.1**. `0.1.0` exists in npm's history but was
+> broken for installers (a packaging bug — its manifest pointed at unshipped
+> `src`); it's fixed in 0.1.1 and guarded by a real install-and-import CI check.
+> See [CHANGELOG.md](./CHANGELOG.md).
 
-Standard flat-config plugin; also runs under oxlint via `jsPlugins` unchanged.
-This repo's [.oxlintrc.json](./.oxlintrc.json) is a working example.
-
-### From source (until published)
+### From source
 
 ```sh
 git clone https://github.com/vsm1996/aria && cd aria
 pnpm install
 pnpm test                                   # all rules + CLI parity + gate tests
-pnpm --filter @aria-a11y/cli build               # build the CLI
+pnpm --filter @aria-a11y/cli build          # build the CLI
 node packages/cli/dist/cli.js check src     # run it against your code
 ```
 
