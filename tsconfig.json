@@ -1,10 +1,20 @@
 {
   "extends": "./tsconfig.base.json",
   "compilerOptions": {
-    "noEmit": true
+    "noEmit": true,
+    // In-repo, resolve the plugin to its TS source for type-checking — the
+    // type-checker analog of the vitest alias. The published `exports` point at
+    // `dist` (built .d.ts), which isn't present before a build; this keeps the
+    // root typecheck (CI's gate, which does not build first) resolving to src.
+    // Scoped to THIS config: the whole-repo program has no `rootDir`, so pulling
+    // the plugin's src in is fine (per-package configs resolve via node_modules).
+    "baseUrl": ".",
+    "paths": {
+      "eslint-plugin-aria-a11y": ["./packages/eslint-plugin/src/index.ts"]
+    }
   },
   "include": [
     "packages/*/src",
-    "vitest.workspace.ts"
+    "vitest.config.ts"
   ]
 }
