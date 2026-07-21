@@ -1,20 +1,55 @@
 {
   "name": "eslint-plugin-aria-a11y",
-  "version": "0.0.0",
-  "private": true,
+  "version": "0.1.0",
+  "description": "The accessibility formatter — meaning-preserving ARIA fixes that gate CI, plus lint-tier a11y checks. Runs in ESLint and oxlint.",
+  "keywords": [
+    "eslint",
+    "eslintplugin",
+    "eslint-plugin",
+    "accessibility",
+    "a11y",
+    "aria",
+    "wcag",
+    "jsx",
+    "react",
+    "oxlint",
+    "formatter"
+  ],
+  "homepage": "https://github.com/vsm1996/aria#readme",
+  "bugs": "https://github.com/vsm1996/aria/issues",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/vsm1996/aria.git",
+    "directory": "packages/eslint-plugin"
+  },
+  "license": "MIT",
+  "author": "Vanessa Martin",
   "type": "module",
   "main": "./src/index.ts",
   "types": "./src/index.ts",
   "exports": {
     ".": "./src/index.ts"
   },
+  "files": [
+    "dist"
+  ],
+  "publishConfig": {
+    "main": "./dist/index.cjs",
+    "module": "./dist/index.js",
+    "types": "./dist/index.d.ts",
+    "exports": {
+      ".": {
+        "types": "./dist/index.d.ts",
+        "import": "./dist/index.js",
+        "require": "./dist/index.cjs"
+      }
+    }
+  },
   "scripts": {
     "build": "tsup",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@aria/config": "workspace:*",
-    "@aria/core": "workspace:*",
     "aria-query": "^5.3.2",
     "cosmiconfig": "^9.0.2"
   },
@@ -22,6 +57,8 @@
     "eslint": ">=9"
   },
   "devDependencies": {
+    "@aria/config": "workspace:*",
+    "@aria/core": "workspace:*",
     "@types/aria-query": "^5.0.4"
   }
 }
