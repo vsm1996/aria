@@ -187,7 +187,7 @@ node packages/cli/dist/cli.js check src     # run it against your code
 
 - npm: [`eslint-plugin-aria-a11y`](https://www.npmjs.com/package/eslint-plugin-aria-a11y) · [`@aria-a11y/cli`](https://www.npmjs.com/package/@aria-a11y/cli)
 - [CHANGELOG](./CHANGELOG.md) — including why 0.1.0 exists but shouldn't be used
-- [Site source](https://github.com/vsm1996/aria-site) — the docs/marketing site (itself checked by Aria: zero findings)
+- [aria-formatter.vercel.app](https://aria-formatter.vercel.app/) — the docs/marketing site, itself checked by Aria: zero findings ([source](https://github.com/vsm1996/aria-site))
 
 ## Architecture & contributing
 

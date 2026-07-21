@@ -23,30 +23,36 @@ you. Use it for every `context.report`. Never call `context.report` directly.
 
 ---
 
-## Current status: Phase 0 complete / Phase 1 in progress
+## Current status: Phases 0–5 complete. Published. Nothing in flight.
 
-**Phase 0 done:**
-- Monorepo wired: pnpm workspaces + Turborepo
-- `@aria/core`: tier gate, basis→fix-kind policy, `assertGate`, `AriaRuleMeta`
-- `@aria/config`: `ComponentSemantic` schema, `defineConfig`
-- `eslint-plugin-aria-a11y`: plugin skeleton, `emit` helper
-- `gate.test.ts` green (run it to confirm: `pnpm test --filter @aria/core`)
+- **All 8 MVP rules shipped** (3 format-tier, 5 lint-tier) — statuses, bases,
+  spec citations, and every documented judgment call live in
+  `docs/rule-registry.md`. Nothing is marked shipped there that isn't tested
+  and CI-gated.
+- **Both packages live on npm at `0.1.1`**: `eslint-plugin-aria-a11y` and
+  `@aria-a11y/cli` (the CLI wraps ESLint's `Linter` with a Babel→ESTree
+  parser — "Option B", an approved deviation from the plan's own-runner
+  sketch; see the note in §5 below). 0.1.0 is broken for installers
+  (packaging bug, see CHANGELOG.md) — never point anyone at it.
+- **CI is a required check with branch protection on `main`** — four gates on
+  every push/PR: `pnpm typecheck`, `pnpm test`, `pnpm parity:oxlint`
+  (ESLint ↔ oxlint fixture parity, zero drift), and `pnpm verify:pack`
+  (packs both packages the way they are really published, installs the
+  tarballs into a clean external dir, and does a real import / bin run).
+  Direct pushes to `main` are rejected; everything lands via PR.
+- **The config bridge is live with three consumers**
+  (`interactive-role-required`, `img-needs-alt`, `control-needs-name`).
+- **Phase 5 validation done** — five OSS repos, product findings hand-reviewed,
+  two rule bugs found and fixed with regression fixtures (`docs/validation.md`).
+- **Docs site live**: https://aria-formatter.vercel.app (source:
+  github.com/vsm1996/aria-site — checked by Aria itself, zero findings).
 
-**Phase 1 task (RED → GREEN):**
-`packages/eslint-plugin/src/rules/no-redundant-role.ts` is a stub.
-The test in `no-redundant-role.test.ts` is red. Make it green.
-
-Implementation instructions live in the stub's TODO comment. Key points:
-1. Visit `JSXOpeningElement`
-2. Skip custom components (capitalized names) and dynamic role values
-3. Use `aria-query` to look up the element's implicit role
-4. Honor attribute conditions: `<a>` is only `link` with `href`
-5. Report via `emit` with `basis: 'native'` and a fix that removes the attribute
-   **plus the space before it** (so `<button>` not `<button >`)
-6. Never pass `basis: 'inferred'` from this rule — it would trip the gate
-
-When green: run `pnpm test` (all packages), confirm nothing else broke,
-then update `docs/rule-registry.md` to mark `no-redundant-role` as `SHIPPED`.
+**What's next when work resumes:** Phase 6 (multi-framework via
+`@aria/normalize`) is roadmap-gated on host parser support — see the Watch
+queue in the registry. Smaller candidates flagged in the registry: the
+idref-resolves near-match auto-fix (high bar documented), control-needs-name
+scope extensions (input number/range, button-types), and the
+aria-hidden-not-focusable component path via role→focusability.
 
 ---
 
@@ -64,7 +70,9 @@ then update `docs/rule-registry.md` to mark `no-redundant-role` as `SHIPPED`.
    the ARIA / HTML-AAM basis. See existing rules for the pattern.
 7. **Determinism.** Same input, same output. No `Date.now`, no ordering assumptions.
 8. **Conventional commits.** `feat(rules): ...`, `fix(plugin): ...`, `docs(registry): ...`
-9. **Before declaring done:** run `pnpm typecheck && pnpm test`. Paste results.
+9. **Before declaring done:** run `pnpm typecheck && pnpm test && pnpm
+   parity:oxlint` (and `pnpm verify:pack` if packaging/publish surfaces were
+   touched). Paste results. These are the same gates CI enforces.
 10. **Ask before widening scope.** New framework adapters, CLI changes, or gate
     changes are decisions, not implementation details. Flag them.
 
@@ -73,12 +81,17 @@ then update `docs/rule-registry.md` to mark `no-redundant-role` as `SHIPPED`.
 ## Package map
 
 ```
-packages/core/            @aria/core            gate, policy, AriaRuleMeta types
-packages/config/          @aria/config          ComponentSemantic schema, defineConfig
-packages/eslint-plugin/   eslint-plugin-aria-a11y  PRIMARY deliverable
+packages/core/            @aria/core            gate, policy, AriaRuleMeta types (internal, unpublished)
+packages/config/          @aria/config          ComponentSemantic schema, loader, resolvers (internal, unpublished)
+packages/eslint-plugin/   eslint-plugin-aria-a11y  PRIMARY deliverable (npm, 0.1.1)
   src/util/emit.ts        gate-aware context.report wrapper
-  src/rules/              one file + one test file per rule
-docs/rule-registry.md     source of truth for every rule's status
+  src/util/resolve-role.ts  shared role resolution (implicit/effective role, attr states)
+  src/rules/              one rule + one test + one .fixtures.ts per rule
+packages/cli/             @aria-a11y/cli        zero-config CLI (npm, 0.1.1); wraps ESLint's Linter, Babel parser
+scripts/oxlint-parity.mjs ESLint↔oxlint parity harness (auto-discovers *.fixtures.ts)
+scripts/verify-pack.mjs   real pack→install→import publish verification
+docs/rule-registry.md     source of truth for every rule's status + judgment calls
+docs/validation.md        Phase 5 real-repo validation results
 CLAUDE.md                 this file: working agreement + full plan/architecture
 ```
 
@@ -87,8 +100,13 @@ CLAUDE.md                 this file: working agreement + full plan/architecture
 ## Dependency policy
 
 Add no new dependency without a one-line justification in the commit message.
-Current approved deps: `aria-query` (role/attribute truth tables — the only
-source of spec truth, never hand-roll role tables), `eslint` (host API).
+Current approved runtime deps: `aria-query` (role/attribute truth tables — the
+only source of spec truth, never hand-roll role tables), `eslint` (host API;
+also the CLI's internal engine under Option B), `cosmiconfig` (config
+discovery, sanctioned in §7), and the CLI's parser stack
+(`@babel/core`, `@babel/eslint-parser`, `@babel/preset-react`,
+`@babel/preset-typescript` — scoped to `packages/cli` only, per the purity
+boundary). Dev-only: `oxlint` (the second host, for the parity gate).
 
 ---
 
@@ -97,8 +115,12 @@ source of spec truth, never hand-roll role tables), `eslint` (host API).
 A task is done when:
 - `pnpm typecheck` exits 0 across all packages
 - `pnpm test` exits 0 across all packages
+- `pnpm parity:oxlint` reports zero drift (and `pnpm verify:pack` passes if
+  packaging/publish surfaces were touched)
 - `docs/rule-registry.md` reflects the new status
 - No `context.report` call exists outside of `emit`
+- It landed on `main` through a PR with the CI check green (branch protection
+  rejects direct pushes — including yours)
 # Aria: Implementation Plan & Working Spec
 
 > This file lives at repo root. It is the build spec, the architecture of record, and the working agreement for Claude Code. Read it in full before writing or changing anything. When code and this file disagree, this file wins until you change it on purpose.
@@ -304,6 +326,20 @@ aria lint --fix [paths]     # apply ONLY native|declared-basis fixes, never infe
 aria explain <rule-id>      # print the rule, its tier, and its spec basis
 ```
 
+> **As shipped (deliberate deviation, approved during Phase 5):** the published
+> CLI is `@aria-a11y/cli` with two commands — `aria check` (reports both tiers,
+> exits nonzero on any format-tier issue: the CI teeth) and `aria fix` (applies
+> format-tier fixes only; lint suggestions never). And instead of an own runner
+> over a raw Babel AST, it wraps ESLint's `Linter` with `@babel/eslint-parser`
+> ("Option B"): a raw `@babel/parser` AST does not match the ESTree shapes the
+> rules consume (`StringLiteral` vs `Literal`, no `.parent`), so an own runner
+> would have meant forking rule logic or re-implementing the Babel→ESTree
+> bridge — both worse than an internal `eslint` dependency. The rules run
+> completely unchanged, output is identical to ESLint by construction, and a
+> parity test asserts it. "Standalone" means zero-config/no host setup, not
+> zero ESLint code inside. `fmt --check` semantics live in `aria check`'s exit
+> code; `explain` is unbuilt (the registry serves that role today).
+
 `--check` is the product, in plugin form or CLI form. In a host it is the failing lint run on an `error`-severity Aria rule. Standalone it is this exit code. Either way it turns "I'll do a11y later" into a red build today.
 
 Reporters (CLI): `pretty` (default), `json`, `sarif`. In a host, reporting is the host's job.
@@ -420,6 +456,15 @@ When operating in this repo:
 ## 11. Milestones
 
 Each phase ends with acceptance criteria that are testable, not aspirational. Do not advance until the prior phase's criteria pass.
+
+> **Status:** Phases 0–5 are **COMPLETE** — all acceptance criteria below were
+> met and are enforced in CI where applicable (the registry and
+> `docs/validation.md` hold the evidence; both packages published at 0.1.1).
+> Two scope notes against the original text: Phase 5's validation ran against
+> five OSS repos rather than "10+ plus Renge" (documented in validation.md),
+> and the standalone CLI shipped as an ESLint-`Linter` wrapper rather than an
+> own runner (see the "As shipped" note in §5). Phase 6 has not started and
+> remains roadmap-gated on host parser support.
 
 **Phase 0: Skeleton (week 1).**
 Monorepo, `core` rule types, the tier gate and the basis-to-fix-kind policy as code, an empty `eslint-plugin-aria-a11y` that loads, cosmiconfig loader.
