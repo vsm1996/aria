@@ -119,7 +119,7 @@ there that isn't tested and CI-gated here.
 Two surfaces, one rule set. **Not yet published to npm** (publish prep is done;
 see below), so today you run from a clone — but the shapes are final.
 
-### `@aria/cli` — the zero-config CLI
+### `@aria-a11y/cli` — the zero-config CLI
 
 ```sh
 aria check [paths]   # report a11y diagnostics (both tiers); exits nonzero on
@@ -151,7 +151,7 @@ This repo's [.oxlintrc.json](./.oxlintrc.json) is a working example.
 git clone https://github.com/vsm1996/aria && cd aria
 pnpm install
 pnpm test                                   # all rules + CLI parity + gate tests
-pnpm --filter @aria/cli build               # build the CLI
+pnpm --filter @aria-a11y/cli build               # build the CLI
 node packages/cli/dist/cli.js check src     # run it against your code
 ```
 
