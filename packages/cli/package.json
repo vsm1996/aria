@@ -1,6 +1,6 @@
 {
   "name": "@aria-a11y/cli",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Zero-config standalone CLI for Aria's accessibility rules — aria check / aria fix, no ESLint config required.",
   "keywords": [
     "accessibility",
@@ -26,22 +26,17 @@
   "bin": {
     "aria": "./dist/cli.js"
   },
-  "main": "./src/cli.ts",
+  "main": "./dist/runner.js",
+  "types": "./dist/runner.d.ts",
   "exports": {
-    ".": "./src/runner.ts"
+    ".": {
+      "types": "./dist/runner.d.ts",
+      "import": "./dist/runner.js"
+    }
   },
   "files": [
     "dist"
   ],
-  "publishConfig": {
-    "main": "./dist/runner.js",
-    "exports": {
-      ".": {
-        "types": "./dist/runner.d.ts",
-        "import": "./dist/runner.js"
-      }
-    }
-  },
   "scripts": {
     "build": "tsup",
     "typecheck": "tsc --noEmit"

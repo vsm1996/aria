@@ -39,3 +39,9 @@ jobs:
       # Builds the plugin itself (oxlint loads dist/), then diffs every
       # fixture across ESLint and oxlint. Exits nonzero on any drift.
       - run: pnpm parity:oxlint
+
+      # Packs each package the way it is really published, installs the tarball
+      # into a clean external dir, and does a real import / bin run. Catches
+      # the class of packaging bug that shipped 0.1.0 broken (a dry-run file
+      # list looked clean while the manifest pointed at unshipped src).
+      - run: pnpm verify:pack

@@ -1,6 +1,6 @@
 {
   "name": "eslint-plugin-aria-a11y",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "The accessibility formatter — meaning-preserving ARIA fixes that gate CI, plus lint-tier a11y checks. Runs in ESLint and oxlint.",
   "keywords": [
     "eslint",
@@ -25,26 +25,19 @@
   "license": "MIT",
   "author": "Vanessa Martin",
   "type": "module",
-  "main": "./src/index.ts",
-  "types": "./src/index.ts",
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
   "exports": {
-    ".": "./src/index.ts"
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "require": "./dist/index.cjs"
+    }
   },
   "files": [
     "dist"
   ],
-  "publishConfig": {
-    "main": "./dist/index.cjs",
-    "module": "./dist/index.js",
-    "types": "./dist/index.d.ts",
-    "exports": {
-      ".": {
-        "types": "./dist/index.d.ts",
-        "import": "./dist/index.js",
-        "require": "./dist/index.cjs"
-      }
-    }
-  },
   "scripts": {
     "build": "tsup",
     "typecheck": "tsc --noEmit"

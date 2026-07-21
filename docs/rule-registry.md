@@ -45,17 +45,35 @@ All eight rules ship in two surfaces from one rule set:
   the shared fixtures.
 
 **Publish-readiness:** both packages carry final metadata (description, repo,
-keywords, `license: MIT`, CLI `bin`), a root `LICENSE` (MIT) exists, and
-`pnpm pack` dry-runs are clean — each tarball is `dist/` + `LICENSE` +
-`README` + `package.json` only (no src, maps, or tests; ~27K plugin / ~17K
-CLI), with `publishConfig` repointing entry fields at `dist`. **Not published**
-— that trigger is the maintainer's. One open item for the maintainer: `@aria-a11y/cli`
-is a scoped name and needs the `@aria` npm scope (or a rename) before a real
-publish.
+keywords, `license: MIT`, CLI `bin`), a per-package `LICENSE`, a per-package
+`README`, and entry fields (`main`/`types`/`exports`) that point at `dist`
+**directly** — see the packaging note below. **Not published** — that trigger
+is the maintainer's.
 
-Validation against five OSS repos and the two bugs it surfaced are in
-[validation.md](./validation.md); both bugs are now RESOLVED (see Known Issues
-above).
+**Packaging bug — 0.1.0 shipped broken; fixed in 0.1.1.** `eslint-plugin-aria-a11y@0.1.0`
+went out with `main`/`exports` pointing at `./src/index.ts`, which
+`files: ["dist"]` never shipped, so every install failed with
+ERR_MODULE_NOT_FOUND. Root cause: the dist entry points were expressed via a
+`publishConfig` field override, which is a **pnpm-only** feature — `npm publish`
+(and `npm pack`) silently ignore it and keep the `src` pointers. The package
+was published with `npm`, so the override never applied. A `--dry-run` file
+list looked clean because it never resolved the manifest fields npm actually
+respects. **Fix:** the top-level `main`/`types`/`exports` now point at `dist`
+directly (no `publishConfig` override, tool-independent), and the in-repo dev
+loop resolves the plugin to `src` via a vitest alias (`vitest.config.ts`) so
+nothing `src`-shaped ever reaches a manifest. Verified by a real install: both
+`npm pack` and `pnpm pack` produce dist-only manifests, and `pnpm verify:pack`
+installs each tarball into a clean external dir and actually imports / runs it
+(now a blocking CI step). Bumped both packages to **0.1.1**.
+
+**Publish tooling — the CLI must use `pnpm publish`.** `@aria-a11y/cli` depends
+on `eslint-plugin-aria-a11y` via `workspace:^`, which only `pnpm publish` /
+`pnpm pack` convert to a real range (`^0.1.1`); plain `npm publish` leaks the
+`workspace:` protocol into a runtime dependency. The plugin itself is
+tool-independent. Publish plugin first, then the CLI with `pnpm publish`.
+
+Validation against five OSS repos and the two rule bugs it surfaced are in
+[validation.md](./validation.md); both are RESOLVED (see Known Issues above).
 
 ---
 
