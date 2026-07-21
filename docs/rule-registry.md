@@ -34,6 +34,29 @@ Both Phase 5 validation bugs are now resolved.
 - `CANDIDATE`  — in scope, not yet started
 - `WATCH`      — awaiting host platform support before implementation
 
+## Distribution status (Phase 5)
+
+All eight rules ship in two surfaces from one rule set:
+
+- **`eslint-plugin-aria-a11y`** — the plugin (ESLint + oxlint via `jsPlugins`).
+- **`@aria/cli`** — the zero-config standalone CLI (`aria check` / `aria fix`),
+  ESLint's `Linter` wrapped with a Babel→ESTree parser (Option B). The rules run
+  unchanged; a parity test asserts CLI output is identical to ESLint's Linter on
+  the shared fixtures.
+
+**Publish-readiness:** both packages carry final metadata (description, repo,
+keywords, `license: MIT`, CLI `bin`), a root `LICENSE` (MIT) exists, and
+`pnpm pack` dry-runs are clean — each tarball is `dist/` + `LICENSE` +
+`README` + `package.json` only (no src, maps, or tests; ~27K plugin / ~17K
+CLI), with `publishConfig` repointing entry fields at `dist`. **Not published**
+— that trigger is the maintainer's. One open item for the maintainer: `@aria/cli`
+is a scoped name and needs the `@aria` npm scope (or a rename) before a real
+publish.
+
+Validation against five OSS repos and the two bugs it surfaced are in
+[validation.md](./validation.md); both bugs are now RESOLVED (see Known Issues
+above).
+
 ---
 
 ## Format-tier rules (basis: native | declared)

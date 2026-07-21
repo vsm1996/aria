@@ -1,15 +1,46 @@
 {
   "name": "@aria/cli",
-  "version": "0.0.0",
-  "private": true,
-  "type": "module",
+  "version": "0.1.0",
   "description": "Zero-config standalone CLI for Aria's accessibility rules — aria check / aria fix, no ESLint config required.",
+  "keywords": [
+    "accessibility",
+    "a11y",
+    "aria",
+    "wcag",
+    "jsx",
+    "react",
+    "cli",
+    "linter",
+    "formatter"
+  ],
+  "homepage": "https://github.com/vsm1996/aria#readme",
+  "bugs": "https://github.com/vsm1996/aria/issues",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/vsm1996/aria.git",
+    "directory": "packages/cli"
+  },
+  "license": "MIT",
+  "author": "Vanessa Martin",
+  "type": "module",
   "bin": {
     "aria": "./dist/cli.js"
   },
   "main": "./src/cli.ts",
   "exports": {
     ".": "./src/runner.ts"
+  },
+  "files": [
+    "dist"
+  ],
+  "publishConfig": {
+    "main": "./dist/runner.js",
+    "exports": {
+      ".": {
+        "types": "./dist/runner.d.ts",
+        "import": "./dist/runner.js"
+      }
+    }
   },
   "scripts": {
     "build": "tsup",
@@ -22,10 +53,10 @@
     "@babel/preset-typescript": "^7.27.0",
     "aria-query": "^5.3.2",
     "cosmiconfig": "^9.0.0",
-    "eslint": "^9.13.0",
-    "eslint-plugin-aria-a11y": "workspace:*"
+    "eslint": "^9.13.0"
   },
   "devDependencies": {
+    "eslint-plugin-aria-a11y": "workspace:*",
     "tsup": "^8.3.0"
   }
 }
