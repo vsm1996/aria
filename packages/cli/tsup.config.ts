@@ -6,9 +6,10 @@ export default defineConfig({
   dts: true,
   clean: true,
   banner: { js: '#!/usr/bin/env node' },
-  // Bundle the workspace packages (their package entries point at TS source,
-  // which the built CLI cannot import); keep third-party runtime deps external
-  // so they resolve from node_modules.
-  noExternal: [/^@aria\//, 'eslint-plugin-aria-a11y'],
-  external: ['eslint', 'aria-query', 'cosmiconfig', /^@babel\//],
+  // Everything is external — nothing from the workspace is bundled. The rules
+  // live in ONE place: eslint-plugin-aria-a11y is a real runtime dependency,
+  // resolved from node_modules at run time, so a published plugin patch reaches
+  // the CLI without rebuilding it. (Its own deps — aria-query, cosmiconfig,
+  // @aria/config, @aria/core — come with it and never touch the CLI directly.)
+  external: ['eslint', 'eslint-plugin-aria-a11y', /^@babel\//],
 });
