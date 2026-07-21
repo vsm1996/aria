@@ -34,21 +34,23 @@ Both Phase 5 validation bugs are now resolved.
 - `CANDIDATE`  — in scope, not yet started
 - `WATCH`      — awaiting host platform support before implementation
 
-## Distribution status (Phase 5)
+## Distribution status (Phase 5) — PUBLISHED
 
-All eight rules ship in two surfaces from one rule set:
+All eight rules ship in two surfaces from one rule set, **both live on npm at
+`0.1.1`**:
 
-- **`eslint-plugin-aria-a11y`** — the plugin (ESLint + oxlint via `jsPlugins`).
-- **`@aria-a11y/cli`** — the zero-config standalone CLI (`aria check` / `aria fix`),
-  ESLint's `Linter` wrapped with a Babel→ESTree parser (Option B). The rules run
-  unchanged; a parity test asserts CLI output is identical to ESLint's Linter on
-  the shared fixtures.
+- **[`eslint-plugin-aria-a11y`](https://www.npmjs.com/package/eslint-plugin-aria-a11y)**
+  — the plugin (ESLint + oxlint via `jsPlugins`).
+  `npm install --save-dev eslint eslint-plugin-aria-a11y`
+- **[`@aria-a11y/cli`](https://www.npmjs.com/package/@aria-a11y/cli)** — the
+  zero-config standalone CLI, ESLint's `Linter` wrapped with a Babel→ESTree
+  parser (Option B); output identical to the plugin (a parity test asserts it).
+  `npx @aria-a11y/cli check src`
 
-**Publish-readiness:** both packages carry final metadata (description, repo,
-keywords, `license: MIT`, CLI `bin`), a per-package `LICENSE`, a per-package
-`README`, and entry fields (`main`/`types`/`exports`) that point at `dist`
-**directly** — see the packaging note below. **Not published** — that trigger
-is the maintainer's.
+Verified live: a real external install imports all 8 rules + `configs.recommended`
+from the published package, and `npx @aria-a11y/cli check` fires them.
+Start at **0.1.1** — see the packaging note and [CHANGELOG.md](../CHANGELOG.md)
+for why 0.1.0 exists but should not be used.
 
 **Packaging bug — 0.1.0 shipped broken; fixed in 0.1.1.** `eslint-plugin-aria-a11y@0.1.0`
 went out with `main`/`exports` pointing at `./src/index.ts`, which
