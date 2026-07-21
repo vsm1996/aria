@@ -10,7 +10,8 @@
   "scripts": {
     "test": "vitest run --reporter verbose",
     "typecheck": "tsc --noEmit -p tsconfig.json",
-    "parity:oxlint": "pnpm --filter eslint-plugin-aria-a11y build && node scripts/oxlint-parity.mjs"
+    "parity:oxlint": "pnpm --filter eslint-plugin-aria-a11y build && node scripts/oxlint-parity.mjs",
+    "verify:pack": "node scripts/verify-pack.mjs"
   },
   "devDependencies": {
     "@types/node": "^22.0.0",
