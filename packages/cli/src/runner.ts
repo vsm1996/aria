@@ -84,9 +84,47 @@ function toDiagnostics(messages: LinterNS.LintMessage[]): AriaDiagnostic[] {
     }));
 }
 
+/**
+ * An eslint-disable comment referencing a rule this standalone runner doesn't
+ * define ("Definition for rule '…' was not found") is a config/environment
+ * mismatch with the PROJECT's own ESLint setup, not an accessibility finding —
+ * real-world source (and Next.js build output) is full of such comments, and
+ * surfacing each one drowned real findings (CHANGELOG 0.1.2).
+ *
+ * FOOTGUN GUARD: this suppression applies ONLY to rules outside `aria-a11y/`.
+ * An unknown `aria-a11y/*` definition would mean one of OUR rules failed to
+ * load — that must stay a loud error, never look like a clean pass. A test
+ * pins the difference.
+ */
+const UNKNOWN_RULE_RE = /^Definition for rule '(.+)' was not found\.?$/;
+
+function isForeignUnknownRule(m: LinterNS.LintMessage): boolean {
+  return (
+    !m.fatal &&
+    UNKNOWN_RULE_RE.test(m.message) &&
+    m.ruleId !== null &&
+    !m.ruleId.startsWith('aria-a11y/')
+  );
+}
+
+export interface LintDetail {
+  diagnostics: AriaDiagnostic[];
+  /** Count of suppressed foreign eslint-disable rule references (summary, not findings). */
+  foreignRuleReferences: number;
+}
+
 /** Lint one source string. `filename` drives TS/TSX detection and config discovery. */
+export function lintTextDetailed(code: string, filename: string): LintDetail {
+  const messages = linter.verify(code, baseConfig, resolve(filename));
+  const foreign = messages.filter(isForeignUnknownRule).length;
+  return {
+    diagnostics: toDiagnostics(messages.filter((m) => !isForeignUnknownRule(m))),
+    foreignRuleReferences: foreign,
+  };
+}
+
 export function lintText(code: string, filename: string): AriaDiagnostic[] {
-  return toDiagnostics(linter.verify(code, baseConfig, resolve(filename)));
+  return lintTextDetailed(code, filename).diagnostics;
 }
 
 /**
@@ -98,8 +136,13 @@ export function lintText(code: string, filename: string): AriaDiagnostic[] {
 export function fixText(
   code: string,
   filename: string,
-): { output: string; remaining: AriaDiagnostic[] } {
+): { output: string; remaining: AriaDiagnostic[]; foreignRuleReferences: number } {
   const result = linter.verifyAndFix(code, baseConfig, resolve(filename));
-  return { output: result.output, remaining: toDiagnostics(result.messages) };
+  const foreign = result.messages.filter(isForeignUnknownRule).length;
+  return {
+    output: result.output,
+    remaining: toDiagnostics(result.messages.filter((m) => !isForeignUnknownRule(m))),
+    foreignRuleReferences: foreign,
+  };
 }
 

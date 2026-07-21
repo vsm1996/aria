@@ -36,13 +36,13 @@ Both Phase 5 validation bugs are now resolved.
 
 ## Distribution status (Phase 5) — PUBLISHED
 
-All eight rules ship in two surfaces from one rule set, **both live on npm at
-`0.1.1`**:
+All eight rules ship in two surfaces from one rule set. As of 0.1.2 the two
+packages version independently (see CHANGELOG): **plugin `0.1.1`, CLI `0.1.2`**.
 
 - **[`eslint-plugin-aria-a11y`](https://www.npmjs.com/package/eslint-plugin-aria-a11y)**
-  — the plugin (ESLint + oxlint via `jsPlugins`).
+  `0.1.1` — the plugin (ESLint + oxlint via `jsPlugins`).
   `npm install --save-dev eslint eslint-plugin-aria-a11y`
-- **[`@aria-a11y/cli`](https://www.npmjs.com/package/@aria-a11y/cli)** — the
+- **[`@aria-a11y/cli`](https://www.npmjs.com/package/@aria-a11y/cli)** `0.1.2` — the
   zero-config standalone CLI, ESLint's `Linter` wrapped with a Babel→ESTree
   parser (Option B); output identical to the plugin (a parity test asserts it).
   `npx @aria-a11y/cli check src`
@@ -51,6 +51,20 @@ Verified live: a real external install imports all 8 rules + `configs.recommende
 from the published package, and `npx @aria-a11y/cli check` fires them.
 Start at **0.1.1** — see the packaging note and [CHANGELOG.md](../CHANGELOG.md)
 for why 0.1.0 exists but should not be used.
+
+**CLI 0.1.2 — real-world walker fix.** Running `aria check .` against an
+external Next.js project recursed into `.next/**` build output, whose generated
+bundles carry `eslint-disable` comments for rules the standalone runner doesn't
+define — surfacing 77 `Definition for rule '…' was not found` errors that
+drowned the one real source finding. The CLI now default-skips build/output
+directories (`.next`, `out`, `build`, `dist`, `node_modules`, …), honours the
+project's root `.gitignore`, and demotes foreign (non-`aria-a11y/`)
+disable-comment rule references to a summary note rather than findings — with a
+footgun guard keeping unknown `aria-a11y/*` references a loud error. This is a
+CLI-runner concern only; **no rule's tier, basis, or behaviour changed**, and
+ESLint ↔ oxlint parity is unaffected (188 fixtures, zero drift). Captured as a
+permanent regression fixture (`packages/cli/src/walk.test.ts`); see
+[CHANGELOG.md](../CHANGELOG.md).
 
 **Packaging bug — 0.1.0 shipped broken; fixed in 0.1.1.** `eslint-plugin-aria-a11y@0.1.0`
 went out with `main`/`exports` pointing at `./src/index.ts`, which
