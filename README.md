@@ -1,6 +1,8 @@
 # Aria
 
 [![CI](https://github.com/vsm1996/aria/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/vsm1996/aria/actions/workflows/ci.yml)
+[![npm: eslint-plugin-aria-a11y](https://img.shields.io/npm/v/eslint-plugin-aria-a11y?label=eslint-plugin-aria-a11y)](https://www.npmjs.com/package/eslint-plugin-aria-a11y)
+[![npm: @aria-a11y/cli](https://img.shields.io/npm/v/%40aria-a11y%2Fcli?label=%40aria-a11y%2Fcli)](https://www.npmjs.com/package/@aria-a11y/cli)
 
 Aria is an accessibility formatter. It holds itself to the contract that made
 code formatters non-optional: **it never changes what the code means.** Prettier
@@ -21,111 +23,117 @@ Every accessibility fact is classified by where its semantics came from:
 > Anything `inferred` is surfaced as a suggestion a human approves — never
 > applied silently.
 
+The gate maps directly onto the hosts' own fix models:
+
+| Basis | Tier | ESLint / oxlint emit | Applied on save / `--fix`? |
+|-------|------|----------------------|----------------------------|
+| `native`, `declared` | format | `fix` | yes — and fails CI when present |
+| `inferred` | lint | `suggestion` | never — a human approves |
+
 That single rule splits the tool into a **format tier** (meaning-preserving,
 subtractive fixes that run on save and fail CI) and a **lint tier** (located
-errors with suggested fixes, never auto-applied). The line between the tiers
-moves: when a design system declares its component semantics via config, those
-diagnostics graduate from guess to known — from suggestion to auto-fix. The
-gate is enforced in code (`@aria/core`), by the host's own fix model, and by
-tests, and this repo's own CI runs the same checks it preaches. The full spec
-lives in [CLAUDE.md](./CLAUDE.md).
+diagnostics, never auto-applied). The line between the tiers moves: when a
+design system declares its component semantics via config, those diagnostics
+graduate from guess to known — from suggestion to auto-fix. The gate is
+enforced three times — in code (`@aria/core`'s `assertGate` makes an
+inferred-basis auto-fix structurally impossible to emit), by the host's own
+fix model, and by tests — and this repo's own CI runs the same checks it
+preaches. The full philosophy lives in [CLAUDE.md](./CLAUDE.md).
 
-## What exists today
+## Status
 
-- **`eslint-plugin-aria-a11y`** with the full format tier implemented and
-  gated:
-  - **`no-redundant-role`** — removes an explicit `role` that duplicates the
-    element's implicit role (`<button role="button">` → `<button>`). Resolves
-    ancestor-dependent roles statically (`<li role="listitem">` is redundant
-    inside a visible `<ul>`, untouchable inside a `<div>` or across any
-    component/portal/dynamic boundary) and stays silent on anything
-    undecidable.
-  - **`no-unsupported-aria`** — removes aria-* attributes WAI-ARIA doesn't
-    support on the element's resolved role (`<button aria-checked>` →
-    `<button>`), using the same full-confidence role resolution. Global ARIA
-    properties are never touched, and an unresolved role means every aria-*
-    on the element stays put.
-  - **`aria-syntax-normalize`** — canonical lowercase for ARIA attribute
-    names (`aria-Label` → `aria-label`) and enumerated values
-    (`aria-hidden="True"` → `"true"`). Only ever changes character case —
-    tested as a property, not a promise.
-- **The first lint-tier rule, with the config bridge live**:
-  **`interactive-role-required`** flags a generic element (div, span) with a
-  click handler and no role, then inspects its children to decide what to say.
-  A button-like element — icon-only, short-labelled, or a labelled icon
-  (`<div onClick><svg/>Save</div>`) — gets a `role="button"` *suggestion*; a
-  genuinely ambiguous one (a card-like mix, or unknown/dynamic content) is
-  report-only; and one that already wraps a real interactive element is left
-  alone (that's a different bug). Every one of
-  those is `inferred` basis, so the gate guarantees the suggestion can never be
-  auto-applied — proven by test on both hosts. Declare a component's semantics
-  in `aria.config.ts` (`componentSemantics: { IconButton: { role: 'button' } }`)
-  and it graduates: basis `declared`, and now a real auto-fix inserting the
-  role. That inferred-vs-declared contrast is a named end-to-end test.
-- **`idref-resolves`** flags `aria-labelledby` / `aria-describedby` /
-  `aria-controls` references to an id that doesn't exist anywhere in the file
-  (each id in a space-separated list checked independently). It's the first
-  rule where basis and tier deliberately diverge: the detection is a `native`
-  fact (the id is or isn't there), but it's report-only and advisory rather
-  than a CI-gating error, because there's no single safe repair and a
-  reference can legitimately point across files. Literal-to-literal only —
-  dynamic ids and references are left alone, and a dynamic id anywhere makes
-  the whole file fail-safe silent.
-- **`img-needs-alt`** flags an `<img>` exposed as an image with no accessible
-  name and no decorative signal (WCAG 1.1.1). `alt=""`, `role="presentation"`,
-  `aria-label`, `aria-labelledby`, and `aria-hidden` all legitimately silence
-  it — the point is presence of *some* valid encoding, not the word "alt".
-  Report-only, `native` basis: the missing name is a fact, but Aria won't
-  invent the alt text (a hard non-goal), so it flags and leaves the words to a
-  human. Also native-basis-but-lint-tier, like `idref-resolves`, but because
-  it's unfixable-by-machine rather than uncertain. Via the config bridge, a
-  component declared `role: 'img'` is checked the same way on its declared
-  accessible-name prop (`nameProp`, defaulting to `alt`) — so a design system's
-  `<Image altText="…">` is understood without assuming the prop is called `alt`.
-- **`control-needs-name`** flags an interactive control with no accessible name
-  — an icon-only `<button>`/`<a href>`, an unlabeled `<input>`/`<textarea>`/
-  `<select>` (WCAG 4.1.2). A name can come from text content, `aria-label`, a
-  resolving `aria-labelledby`, or (for form fields) an associated `<label>` by
-  `htmlFor`/`id` or by wrapping; a placeholder is explicitly *not* a name.
-  Report-only, `native` basis — same unfixable-by-machine reasoning as
-  `img-needs-alt`. Config control components are checked on their declared
-  `nameProp`, the third consumer of that field. Dynamic name sources → silent.
-- **`aria-hidden-not-focusable`** flags `aria-hidden="true"` on a focusable
-  element — or on a subtree that still contains one (the common modal/dropdown
-  bug) — a "focusable ghost" a keyboard user can reach but assistive tech can't
-  see (WAI-ARIA 1.2). `tabindex="-1"` correctly de-focuses it and is silent.
-  Report-only for a third distinct reason: several valid repairs exist (remove
-  `aria-hidden`, add `tabindex="-1"`, or restructure) and which is right depends
-  on intent the tool can't see — so it names them and refuses to pick.
+Everything below is shipped, tested, and CI-gated — the
+[rule registry](./docs/rule-registry.md) is the source of truth, and nothing
+is marked shipped there that isn't.
 
-This is the full MVP rule set — **Phase 3 (the lint tier) is complete.** The
-three format rules gate CI; the five lint rules surface located, human-reviewed
-diagnostics, and config declarations graduate the relevant ones toward auto-fix.
-- **ESLint ↔ oxlint parity, enforced.** The same rule runs under oxlint's
+- **Both packages live on npm at `0.1.1`:**
+  [`eslint-plugin-aria-a11y`](https://www.npmjs.com/package/eslint-plugin-aria-a11y)
+  and [`@aria-a11y/cli`](https://www.npmjs.com/package/@aria-a11y/cli).
+- **All 8 planned MVP rules shipped** — 3 format-tier, 5 lint-tier (below).
+- **CI is a required check with branch protection**: typecheck, the full test
+  suite (including the tier-gate property tests), ESLint ↔ oxlint parity, and
+  a real pack-install-and-import verification on every push and PR.
+- **ESLint ↔ oxlint parity, enforced**: the same rules run under oxlint's
   experimental `jsPlugins` with zero drift across every fixture — diagnostics,
-  locations, and fix output — verified by `pnpm parity:oxlint` on every push
-  and PR, as a required check.
-- **The tier gate as code and tests**: `@aria/core`'s `assertGate` plus a
-  property suite that makes an inferred-basis auto-fix structurally impossible
-  to emit.
+  locations, and fix output.
+- **The config bridge is live with three consumers** (see below).
 
-Everything else — the remaining format rules, the lint tier, the config
-bridge — is designed but not built. The live status of every rule is in
-[docs/rule-registry.md](./docs/rule-registry.md); nothing is marked shipped
-there that isn't tested and CI-gated here.
+### Format tier — auto-fixed, gates CI
+
+| rule | what it does |
+|------|--------------|
+| `no-redundant-role` | Removes an explicit `role` that duplicates the element's implicit role (`<button role="button">` → `<button>`). Resolves ancestor-dependent roles statically; silent on anything undecidable. |
+| `no-unsupported-aria` | Removes aria-* attributes WAI-ARIA doesn't support on the element's resolved role (`<button aria-checked>` → `<button>`). Global ARIA properties are never touched. |
+| `aria-syntax-normalize` | Canonical lowercase for ARIA attribute names (`aria-Label` → `aria-label`) and enumerated values (`aria-hidden="True"` → `"true"`). Only ever changes character case — tested as a property. |
+
+### Lint tier — located diagnostics, human-reviewed, never auto-applied
+
+| rule | what it flags |
+|------|---------------|
+| `interactive-role-required` | A generic element (div, span) with a click handler and no role. Button-like children earn a `role="button"` *suggestion*; ambiguous content is report-only. Graduates to a real auto-fix when config declares the component. |
+| `control-needs-name` | An interactive control with no accessible name — icon-only buttons/links, unlabeled form fields. A placeholder is explicitly *not* a name. |
+| `img-needs-alt` | An `<img>` exposed as an image with no accessible name and no decorative signal. `alt=""`, `role="presentation"`, `aria-label`, and `aria-hidden` all legitimately silence it. |
+| `idref-resolves` | `aria-labelledby` / `aria-describedby` / `aria-controls` references to an id that doesn't exist anywhere in the file. Advisory — a reference can legitimately point across files. |
+| `aria-hidden-not-focusable` | `aria-hidden="true"` on a focusable element, or on a subtree still containing one — a "focusable ghost." Several valid repairs exist, so it names them and refuses to pick. |
+
+Several lint rules detect a `native` *fact* yet stay lint-tier on purpose —
+because the finding is advisory, because only a human can author the repair,
+or because multiple valid repairs exist. The registry documents each reason.
+
+### The config bridge
+
+Declare a component's semantics and the engine stops guessing:
+
+```ts
+// aria.config.ts
+import { defineConfig } from '@aria/config';
+
+export default defineConfig({
+  componentSemantics: {
+    IconButton: { role: 'button' },
+    MyImage: { role: 'img', nameProp: 'altText' },
+  },
+});
+```
+
+Live with three consumers: `interactive-role-required` (a declared role turns
+an inferred suggestion into a declared auto-fix — proven by a named end-to-end
+test), plus `img-needs-alt` and `control-needs-name`, which read the generic
+`nameProp` field to check a design system's accessible-name prop without
+assuming it's called `alt`.
+
+## Validated on real code
+
+Phase 5 ran all 8 rules against five OSS React repos — mui/material-ui,
+excalidraw, vercel/commerce, react-bootstrap, and grommet — with the
+product-code findings reviewed by hand ([full writeup](./docs/validation.md)):
+
+- **24 product-code findings.** The 22 in the app repos (excalidraw, commerce)
+  held up under review as true positives — role-less clickable divs,
+  placeholder-only search inputs, a title-only icon button.
+- **The other two — both on a single MUI element — were false positives,
+  traced to two real rule bugs** (React `tabIndex` casing; `aria-hidden`
+  controls not exempted from the name requirement). Each was fixed in its own
+  tested follow-up with regression fixtures — see Known Issues in the
+  [registry](./docs/rule-registry.md).
+- **The format tier fired zero times** — mature codebases don't ship malformed
+  ARIA syntax, which is the point: its value is gating *changing* code in CI,
+  not bulk-auditing clean repos.
+- **Spread-heavy component libraries are near-silent without config** — the
+  rules refuse to guess through `{...props}`. That's the gap the config bridge
+  exists to close.
 
 ## Using it
 
-Two surfaces, one rule set — **both live on npm** at `0.1.1`.
+Two surfaces, one rule set — the CLI runs the *exact same modules* as the
+plugin, with output identical to ESLint by construction (a parity test asserts
+it).
 
 ### `eslint-plugin-aria-a11y` — the plugin
 
 ```sh
 npm install --save-dev eslint eslint-plugin-aria-a11y
 ```
-
-Standard flat-config plugin; also runs under oxlint via `jsPlugins` unchanged.
-This repo's [.oxlintrc.json](./.oxlintrc.json) is a working example.
 
 ```js
 // eslint.config.js
@@ -135,6 +143,11 @@ export default [
   { plugins: { 'aria-a11y': aria }, rules: aria.configs.recommended.rules },
 ];
 ```
+
+The recommended config sets the three format-tier rules to `error` — that's
+the CI gate — and the five lint-tier rules to `warn`. The plugin also runs
+under oxlint via `jsPlugins`, unchanged; this repo's own
+[.oxlintrc.json](./.oxlintrc.json) is a working example.
 
 ### `@aria-a11y/cli` — the zero-config CLI
 
@@ -151,11 +164,9 @@ how a design system declares component semantics), but requires none.
 
 Under the hood the CLI wraps ESLint's `Linter` programmatically with a
 Babel→ESTree parser — so `eslint` is a real internal dependency. That's an
-implementation detail, not something you configure: the rules are the *exact
-same modules* the ESLint plugin and the oxlint path run, so output is identical
-to ESLint by construction (a parity test asserts it against the same fixtures).
-It is "standalone" in the sense that matters — no ESLint config, no host — not a
-claim of zero ESLint code inside.
+implementation detail, not something you configure. It is "standalone" in the
+sense that matters — no ESLint config, no host — not a claim of zero ESLint
+code inside.
 
 > **Version note:** start at **0.1.1**. `0.1.0` exists in npm's history but was
 > broken for installers (a packaging bug — its manifest pointed at unshipped
@@ -172,9 +183,16 @@ pnpm --filter @aria-a11y/cli build          # build the CLI
 node packages/cli/dist/cli.js check src     # run it against your code
 ```
 
+## Links
+
+- npm: [`eslint-plugin-aria-a11y`](https://www.npmjs.com/package/eslint-plugin-aria-a11y) · [`@aria-a11y/cli`](https://www.npmjs.com/package/@aria-a11y/cli)
+- [CHANGELOG](./CHANGELOG.md) — including why 0.1.0 exists but shouldn't be used
+- [Site source](https://github.com/vsm1996/aria-site) — the docs/marketing site (itself checked by Aria: zero findings)
+
 ## Architecture & contributing
 
 [CLAUDE.md](./CLAUDE.md) is the source of truth: the working agreement, the
 gate, the full implementation plan, and the milestones.
 [docs/rule-registry.md](./docs/rule-registry.md) tracks every rule's tier,
-basis, spec citation, and status. Start there before touching anything.
+basis, spec citation, and status — plus every documented judgment call the
+rules make. Start there before touching anything.
