@@ -30,6 +30,10 @@ export default [
 ];
 ```
 
+> Installing the package doesn't wire it in — you must add it to your
+> `eslint.config.js` as above for `eslint` to pick up the rules. (For a
+> config-free run, use the standalone [`@aria-a11y/cli`](https://www.npmjs.com/package/@aria-a11y/cli) instead.)
+
 ## Rules
 
 Format tier (auto-fix, `error`): `no-redundant-role`, `no-unsupported-aria`,
