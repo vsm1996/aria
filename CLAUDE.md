@@ -236,7 +236,7 @@ interface Diagnostic {
 }
 ```
 
-The runner is pure: `(NormalizedNode tree, RuleContext) -> Diagnostic[]`. No I/O lives in core. File reads, writes, and process exit codes live only in `@aria/cli`. Parsing lives only in adapters. This separation is what makes the property tests in Section 9 possible.
+The runner is pure: `(NormalizedNode tree, RuleContext) -> Diagnostic[]`. No I/O lives in core. File reads, writes, and process exit codes live only in `@aria-a11y/cli`. Parsing lives only in adapters. This separation is what makes the property tests in Section 9 possible.
 
 ---
 
@@ -280,7 +280,7 @@ An ESLint-compatible rule module is already a portable artifact. The host hands 
 
 - **ESLint** (stable substrate, test here)
 - **oxlint** (same API, near-Rust speed via raw transfer, currently alpha, run here for performance)
-- **a thin standalone CLI** (`@aria/cli`, wraps the same rule modules with its own runner, for users on neither host)
+- **a thin standalone CLI** (`@aria-a11y/cli`, wraps the same rule modules with its own runner, for users on neither host)
 
 This is why "standalone later if necessary" is nearly free. The rule logic never moves. Only the harness around it changes.
 
@@ -292,7 +292,7 @@ Biome does not run ESLint-style JS plugins. Its extensibility is GritQL, a struc
 
 - `eslint-plugin-aria-a11y` — the primary deliverable. Standard plugin export, rules emit host-native fix vs. suggestion per the gate table in Section 2.
 - Runs under oxlint via its `jsPlugins` config with no code change.
-- `@aria/cli` — thin standalone wrapper for `fmt` / `lint` / `check`, same rules, own runner. This is the fallback that keeps Aria independent of any host.
+- `@aria-a11y/cli` — thin standalone wrapper for `fmt` / `lint` / `check`, same rules, own runner. This is the fallback that keeps Aria independent of any host.
 
 ### CLI surface (standalone wrapper)
 
@@ -347,7 +347,7 @@ aria/
     rules/            @aria/rules        the rule library (format + lint). pure functions over the host AST.
     eslint-plugin/    eslint-plugin-aria-a11y   PRIMARY deliverable. wraps rules for ESLint/oxlint.
     config/           @aria/config       config schema + cosmiconfig loader + Renge bridge types
-    cli/              @aria/cli          thin standalone wrapper: own runner, reporters, exit codes. the fallback.
+    cli/              @aria-a11y/cli          thin standalone wrapper: own runner, reporters, exit codes. the fallback.
     test-utils/       @aria/test-utils   property validators + golden harness
     normalize/        @aria/normalize    NormalizedNode + adapters. (phase 6, multi-framework only)
   docs/
@@ -442,7 +442,7 @@ Config schema, loader, graduation logic that flips a diagnostic's basis from `in
 *Accept:* declaring `componentSemantics` measurably moves the relevant diagnostics from suggestion to auto-fix and upgrades severity, proven by tests run with and without the declaration. Point it at Renge's component set and watch the safe tier grow.
 
 **Phase 5: Validation and release (week 4-5).**
-Run on 10+ OSS React repos plus Renge, under both ESLint and oxlint. Measure accuracy and false positives. Thin `@aria/cli` wrapper for non-host users. Docs.
+Run on 10+ OSS React repos plus Renge, under both ESLint and oxlint. Measure accuracy and false positives. Thin `@aria-a11y/cli` wrapper for non-host users. Docs.
 *Accept:* targets in Section 9 met. `eslint-plugin-aria-a11y` published, runs under oxlint unmodified, and the standalone CLI runs on a fresh machine.
 
 **Phase 6+: Multi-framework and beyond (later, roadmap-gated).**
