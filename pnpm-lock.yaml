@@ -53,6 +53,9 @@ importers:
       eslint-plugin-aria-a11y:
         specifier: workspace:^
         version: link:../eslint-plugin
+      ignore:
+        specifier: ^7.0.6
+        version: 7.0.6
     devDependencies:
       tsup:
         specifier: ^8.3.0
@@ -1312,6 +1315,10 @@ packages:
 
   ignore@5.3.2:
     resolution: {integrity: sha512-hsBTNUqQTDwkWtcdYI2i06Y/nUBEsNEDJKjWdigLvegy8kDuJAS8uRlpkkcQpyEXL0Z/pjDy5HBmMjRCJ2gq+g==}
+    engines: {node: '>= 4'}
+
+  ignore@7.0.6:
+    resolution: {integrity: sha512-BAg6QkE8W+TuQLrrw0Ugr7HegXduRuuj8/ti2kSOc+jz1dmx8/WNcjr6XGnq5YpDWxFwwaavqD0+jIUOKelTsw==}
     engines: {node: '>= 4'}
 
   import-fresh@3.3.1:
@@ -2916,6 +2923,8 @@ snapshots:
   html-escaper@2.0.2: {}
 
   ignore@5.3.2: {}
+
+  ignore@7.0.6: {}
 
   import-fresh@3.3.1:
     dependencies:
