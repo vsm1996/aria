@@ -116,23 +116,44 @@ there that isn't tested and CI-gated here.
 
 ## Using it
 
-**Not yet.** The plugin isn't published to npm and the packages are marked
-private — there is no supported way to depend on it from another project
-today, and a git-dependency install won't resolve the workspace. To run it
-from source:
+Two surfaces, one rule set. **Not yet published to npm** (publish prep is done;
+see below), so today you run from a clone — but the shapes are final.
+
+### `@aria/cli` — the zero-config CLI
+
+```sh
+aria check [paths]   # report a11y diagnostics (both tiers); exits nonzero on
+                     # any format-tier issue — the CI teeth
+aria fix   [paths]   # apply format-tier (safe, meaning-preserving) fixes only
+```
+
+**Zero-config** means exactly that: no ESLint config file, no host setup — point
+it at files or directories and it works, parsing `.jsx`/`.tsx` (and plain JS) out
+of the box. It picks up an optional `aria.config.{ts,js,json}` if present (that's
+how a design system declares component semantics), but requires none.
+
+Under the hood the CLI wraps ESLint's `Linter` programmatically with a
+Babel→ESTree parser — so `eslint` is a real internal dependency. That's an
+implementation detail, not something you configure: the rules are the *exact
+same modules* the ESLint plugin and the oxlint path run, so output is identical
+to ESLint by construction (a parity test asserts it against the same fixtures).
+It is "standalone" in the sense that matters — no ESLint config, no host — not a
+claim of zero ESLint code inside.
+
+### `eslint-plugin-aria-a11y` — the plugin
+
+Standard flat-config plugin; also runs under oxlint via `jsPlugins` unchanged.
+This repo's [.oxlintrc.json](./.oxlintrc.json) is a working example.
+
+### From source (until published)
 
 ```sh
 git clone https://github.com/vsm1996/aria && cd aria
 pnpm install
-pnpm test           # tier-gate property tests + the rule's full fixture suite
-pnpm parity:oxlint  # the same fixtures through ESLint and oxlint, diffed
+pnpm test                                   # all rules + CLI parity + gate tests
+pnpm --filter @aria/cli build               # build the CLI
+node packages/cli/dist/cli.js check src     # run it against your code
 ```
-
-To experiment with the rule against your own JSX, build the plugin
-(`pnpm --filter eslint-plugin-aria-a11y build`) and load
-`packages/eslint-plugin/dist/index.js` in a flat ESLint config or an
-`.oxlintrc.json` `jsPlugins` entry — this repo's own
-[.oxlintrc.json](./.oxlintrc.json) is a working example.
 
 ## Architecture & contributing
 
