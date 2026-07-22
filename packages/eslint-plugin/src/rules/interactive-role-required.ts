@@ -65,9 +65,12 @@ export const ruleMeta: AriaRuleMeta = {
 //   confident, but the missing role is still a real finding worth flagging.
 //
 //   Component path — the config bridge is the one place a KNOWN answer exists.
-//   When componentSemantics declares the component's role, the basis is
-//   'declared' and the diagnostic carries a real auto-applied fix. An unknown
-//   custom component gets silence, not a guess.
+//   `role` is DESCRIPTIVE; injecting it is opt-in via `injectRole: true` (for a
+//   component that renders a non-semantic element and needs the role). Then the
+//   basis is 'declared' and the diagnostic carries a real auto-applied fix
+//   inserting the role. Without `injectRole`, the role stays descriptive and
+//   this rule does nothing (a native-rendering component must not get a
+//   redundant role stamped on). An unknown component gets silence, not a guess.
 
 /** Expression forms we can confirm are a real click handler. */
 const HANDLER_EXPRESSIONS = new Set([
@@ -253,10 +256,18 @@ export const interactiveRoleRequired: Rule.RuleModule = {
 
         const isComponent = name[0] !== undefined && name[0] !== name[0].toLowerCase();
         if (isComponent) {
-          // The config bridge: a declared semantic turns this from a guess
-          // into ground truth — basis 'declared', real auto-applied fix.
+          // The config bridge: a declared semantic turns this from a guess into
+          // ground truth. But `role` is DESCRIPTIVE — injecting it is opt-in
+          // (Gap C, docs/case-study-renge.md). Only when the component is
+          // declared `injectRole: true` — meaning it renders a non-semantic
+          // element that genuinely needs the role — do we insert it (basis
+          // 'declared', real auto-fix). Otherwise the role informs other rules
+          // (control-needs-name, img-needs-alt) but is never stamped onto
+          // source: a native-rendering component (icon button → <button>) must
+          // not get a redundant role="button" via the config path.
           const semantic = resolveComponentSemantic(config, name);
           if (semantic === undefined) return; // unknown component: nothing safe to guess
+          if (semantic.injectRole !== true) return; // descriptive-only: do not inject
           emit(context, {
             node: esNode,
             messageId: 'declaredRoleMissing',

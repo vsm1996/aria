@@ -303,10 +303,24 @@ double semantics. The graduation path below is the sanctioned alternative.
 
 **The config bridge is now live, consumed by this rule.** Mechanism: on a
 capitalized component with a confirmed onClick and no role, the rule calls
-`resolveComponentSemantic(config, componentName)`. A match turns a situation
-that would otherwise be an inferred report (or, for an unknown component,
-silence) into a `basis: declared` diagnostic with a real auto-applied fix
-inserting the declared role — a known answer, not a guess.
+`resolveComponentSemantic(config, componentName)`. A match **whose semantic
+declares `injectRole: true`** turns a situation that would otherwise be an
+inferred report (or, for an unknown component, silence) into a `basis: declared`
+diagnostic with a real auto-applied fix inserting the declared role — a known
+answer, not a guess.
+
+**`role` is descriptive; injection is opt-in (`injectRole`) — Gap C, resolved
+(docs/case-study-renge.md).** `role` on its own only *informs* rules of the
+component's semantics; it never causes a role to be written. Injection happens
+only when `injectRole: true` is declared, i.e. for a component that renders a
+**non-semantic** element and genuinely needs the role at runtime. A component
+that renders a native control (an icon button → `<button>`) leaves it off, so the
+config path never stamps a redundant `role="button"` on it (the defect
+`no-redundant-role` removes, reached through config). Default is `false` — a
+deliberate behavior change from "inject for any declared role" (see CHANGELOG),
+chosen on the project's usual asymmetry: silently stopping an occasionally-wrong
+injection is never worse than silent, and the stronger behavior is opted *into*
+rather than a wrong default opted out of.
 Config comes from inline rule options (deterministic; what tests and the
 parity harness use) or, absent options, from `@aria/config`'s file loader
 searching upward from the linted file. The named test
@@ -620,13 +634,16 @@ The mechanism: `componentSemantics` in aria.config.ts changes `basis: inferred` 
 silent without a match.
 
 **`ComponentSemantic` schema fields:** `role` (the ARIA role the component
-renders as), `requiresName?` (boolean; declared but not yet consumed),
-`nameProp?` (the prop that carries the accessible name — generic across
-name-aware rules; consumed by `img-needs-alt`, next by `control-needs-name`;
-`resolveNameProp` defaults it to `'alt'` when `role: 'img'`), and `source`
-(always `'declared'`, normalized in). Validation rejects unknown keys and
-non-conforming values loudly; a non-string/empty `nameProp` is rejected like
-every other field.
+renders as — **descriptive**; read by any rule, never on its own a fix),
+`injectRole?` (boolean, default `false`; the **opt-in** that lets
+`interactive-role-required` inject `role="{role}"` — for components that render a
+non-semantic element; Gap C), `requiresName?` (boolean; declared but not yet
+consumed as a hard gate), `nameProp?` (the prop that carries the accessible name
+— generic across name-aware rules; consumed by `img-needs-alt` and
+`control-needs-name`; `resolveNameProp` defaults it to `'alt'` when `role: 'img'`),
+and `source` (always `'declared'`, normalized in). Validation rejects unknown
+keys and non-conforming values loudly; `injectRole` is type-checked boolean, a
+non-string/empty `nameProp` is rejected — every field to the same strictness.
 
 `@aria/config` ships the full mechanism: `loadAriaConfig(searchFrom)`
 (cosmiconfig, upward search to the filesystem root over

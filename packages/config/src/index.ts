@@ -5,8 +5,27 @@
  * (see CLAUDE.md, Implementation Plan §2 and §6 — "the Renge bridge").
  */
 export interface ComponentSemantic {
-  /** The ARIA role this component renders as. */
+  /**
+   * The ARIA role this component renders as. **Descriptive.** Every rule reads
+   * this to understand what the component *is* (name-checking, etc.); on its
+   * own it never causes a role to be written into source. To have
+   * `interactive-role-required` inject `role="…"`, set `injectRole` (below).
+   */
   role: string;
+  /**
+   * Opt in to role INJECTION. When `true`, `interactive-role-required` inserts
+   * `role="{role}"` (a declared-basis auto-fix) on a usage of this component
+   * that has a click handler and no role. Default `false`: `role` stays purely
+   * descriptive.
+   *
+   * Set this only for a component that renders a NON-semantic element and
+   * genuinely needs the role at runtime (a `<div>`-based widget). A component
+   * that renders a native control (e.g. an icon button that renders `<button>`)
+   * must NOT set it — injecting `role="button"` there is redundant with the
+   * native role (the same defect `no-redundant-role` removes), just reached
+   * through the config path. See docs/case-study-renge.md (Gap C).
+   */
+  injectRole?: boolean;
   /** Whether this component must carry an accessible name. */
   requiresName?: boolean;
   /**

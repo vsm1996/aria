@@ -16,9 +16,9 @@ tests did not, and all three are worth fixing before more rules are built on the
 "declare it and it just works" assumption. **Partially validated, with a
 sharper picture of where the bridge's reach actually ends.**
 
-> **Status:** Gaps **A and B are resolved** (this PR) — see the real before/after
-> in each section. Gap **C is a schema decision, proposed but not built** (its
-> own section and PR).
+> **Status:** all three gaps are now **resolved** — A and B in one PR, C
+> (the `injectRole` schema change) in its own, each with the real before/after
+> in its section.
 
 ---
 
@@ -41,16 +41,25 @@ a consumer omits a name the API permits.
 // aria.config.ts — declared from what the components actually do
 export default {
   componentSemantics: {
-    IconButton:  { role: 'button',   requiresName: true, nameProp: 'aria-label' },
+    IconButton:  { role: 'button',   requiresName: true, nameProp: 'aria-label', injectRole: true },
     Checkbox:    { role: 'checkbox', requiresName: true, nameProp: 'label' },
     MultiSelect: { role: 'combobox', requiresName: true, nameProp: 'placeholder' },
   },
 };
 ```
 
-Every entry validates cleanly (`validateAriaConfig` only requires `role` to be a
-non-empty string). The experiment fed this through the deterministic inline
-rule-options path — identical to what the file loader produces.
+Every entry validates cleanly. Note `injectRole: true` on `IconButton`: as of the
+Gap C fix, `role` is descriptive by default and role *injection* is opt-in (see
+Gap C below). It is set here **purely to preserve this document's original
+end-to-end proof** that the graduation produces a real auto-fix (Result 1) — the
+one flag keeps the before/after honest. In a real config you would normally
+**leave it off** for `IconButton`, precisely because it renders a native
+`<button>` and the injected `role="button"` is redundant (that redundancy *is*
+Gap C). `injectRole` earns its keep on a component that renders a *non-semantic*
+element and genuinely needs the role.
+
+The experiment fed this through the deterministic inline rule-options path —
+identical to what the file loader produces.
 
 ---
 
@@ -73,18 +82,26 @@ const C = () => <Checkbox checked={x} onChange={onChange} />;
 **silent both ways** — no false positive.
 
 **`interactive-role-required` · IconButton with a click handler and no role** —
-the headline *suggestion → auto-fix* graduation:
+the headline *suggestion → auto-fix* graduation. Re-verified under the Gap C
+fix, with `injectRole: true` in the config (the opt-in that now gates injection);
+the diagnostic text and fix output are byte-identical to the original capture:
 
 ```
 const C = () => <IconButton onClick={close}><CloseIcon /></IconButton>;
-  NO config: (silent)
-  + config : [AUTO-FIX] <IconButton> is declared as role 'button' via
-             componentSemantics, but this usage carries no role attribute
+  NO config:                          (silent)
+  + config, injectRole: true : [AUTO-FIX] <IconButton> is declared as role 'button'
+             via componentSemantics, but this usage carries no role attribute
              (interactive-role-required; basis: declared).
+  + config, WITHOUT injectRole:       (silent)   ← new default: role is descriptive only
 
-aria fix output:
+aria fix output (injectRole: true):
   const C = () => <IconButton role="button" onClick={close}><CloseIcon/></IconButton>;
 ```
+
+The graduation mechanism is intact. The new default (no injection without
+`injectRole`) is also visible here: without the opt-in the same usage is silent,
+which for a native-`<button>`-rendering IconButton is the *correct* outcome — the
+redundant role is simply not written (Gap C).
 
 Same code, same rule, silent → a real declared-basis auto-fix that actually
 rewrites the source — driven entirely by config. **The bridge mechanism is
@@ -174,7 +191,7 @@ The config no longer lies by omission: a team is told, at the usage site, that
 their declared name requirement can't be honored for that role yet. Pinned by
 fixtures (name-intent role → notice; bare role → silent).
 
-### Gap C — the `role` field is overloaded, and the two consumers disagree · PROPOSED (not built)
+### Gap C — the `role` field was overloaded between two consumers · RESOLVED
 
 A single `role` declaration means two different things to two rules:
 
@@ -200,10 +217,10 @@ schema has no way to say "understand this role for name-checking, but don't
 inject it." A component that renders native semantics wants the former and not
 the latter; today one declaration forces both.
 
-#### Proposal (for review before building)
+#### Fix (built) — proposed, approved, shipped
 
-**Make `role` purely descriptive, and make role *injection* an explicit,
-per-component opt-in.**
+**`role` is now purely descriptive, and role *injection* is an explicit,
+per-component opt-in (`injectRole`).**
 
 Read the two consumers as they actually are: `control-needs-name` and
 `img-needs-alt` already use `role` **read-only** (to decide *whether* to
@@ -259,9 +276,16 @@ could serve future rules that need to know what a component renders, but it's
 heavier (every injectable component must describe its render) and still collapses
 to the same yes/no injection decision. `injectRole` is the minimal field that
 captures the actual choice; the `renders` descriptor is worth revisiting only if
-a second rule needs render information. **Recommend `injectRole`; hold for your
-call before building** (same standard as the `nameProp` decision — this touches
-every current and future config consumer).
+a second rule needs render information. It was set aside.
+
+**As shipped:** `injectRole?: boolean` (default `false`) on `ComponentSemantic`,
+validated with the same strictness as every other field (unknown-key rejection,
+boolean type-check). `interactive-role-required` injects only when
+`injectRole === true`; otherwise the declared role is descriptive and the rule
+writes nothing. Behavior change (loud in the CHANGELOG): an existing
+role-declared component that relied on automatic injection now needs
+`injectRole: true` to keep it. Proven both directions by fixtures
+(`interactive-role-required.fixtures.ts`) and the graduation-contrast test.
 
 ---
 
@@ -279,8 +303,9 @@ every current and future config consumer).
   Icon buttons (the poster child) leaked through the unknown-component-child rule
   (Gap A, **now fixed**); the custom widgets that most need help failed silently
   outside the consuming rule's role scope (Gap B, **now a notice**); and the one
-  overloaded `role` field still makes a single declaration do the right thing for
-  one rule and a redundant thing for another (Gap C, **proposed**).
+  overloaded `role` field made a single declaration do the right thing for one
+  rule and a redundant thing for another (Gap C, **now split**: `role` is
+  descriptive, injection is opt-in via `injectRole`).
 
 None were fatal. All were cheaper to fix now than after more rules assume
 "declare the component and it just works."
@@ -292,11 +317,10 @@ None were fatal. All were cheaper to fix now than after more rules assume
   component with no name is caught.
 - **Gap B — DONE (this PR).** A name intent declared for a role no rule
   name-checks now emits a tooling-scope notice instead of a silent no-op.
-- **Gap C — PROPOSED, not built.** Make `role` descriptive and gate role
-  injection behind an opt-in `injectRole` (see the proposal under Gap C).
-  Additive to the schema, a localized behavior change to
-  `interactive-role-required`. **Held for review before building**, same as the
-  `nameProp` decision — it touches every current and future config consumer.
+- **Gap C — DONE (its own PR).** `role` is now descriptive; role injection is
+  opt-in via `injectRole` (default `false`). Additive to the schema, a localized
+  behavior change to `interactive-role-required`, called out loudly in the
+  CHANGELOG. Was proposed, approved, then built — same review bar as `nameProp`.
 
 **Bottom line:** the config bridge is not vaporware — it moves real diagnostics
 on real components, and the two coverage gaps a real design system exposed are

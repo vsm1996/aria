@@ -14,9 +14,10 @@
  *     `suggestions`.
  *   - SILENT (nested interactive element): a `valid` fixture — the outer
  *     element is left entirely alone (invalid-nesting is a different bug).
- * The DeclaredButton fixtures exercise the config bridge: with the
- * componentSemantics entry in `ruleOptions`, the basis is declared and the
- * fix IS auto-applied.
+ * The DeclaredButton fixtures exercise the config bridge with `injectRole: true`:
+ * the basis is declared and the fix IS auto-applied. DescriptiveButton is the
+ * Gap C counter-case — a declared role WITHOUT injectRole is descriptive only,
+ * so this rule injects nothing (docs/case-study-renge.md).
  *
  * NOTE: this module must stay erasable TypeScript with no imports — the
  * parity script loads it directly under plain Node via type stripping.
@@ -47,7 +48,13 @@ export interface InvalidFixture {
 export const ruleOptions: unknown[] = [
   {
     componentSemantics: {
-      DeclaredButton: { role: 'button', source: 'declared' },
+      // injectRole: true — renders a non-semantic element and needs the role,
+      // so interactive-role-required inserts it (the graduation auto-fix).
+      DeclaredButton: { role: 'button', injectRole: true, source: 'declared' },
+      // Gap C: role declared WITHOUT injectRole → purely descriptive. The role
+      // informs other rules, but this rule never injects it (a native-rendering
+      // component must not get a redundant role stamped on).
+      DescriptiveButton: { role: 'button', source: 'declared' },
     },
   },
 ];
@@ -85,6 +92,11 @@ export const valid: string[] = [
 
   // Declared component whose usage already has a role. Silent.
   '<DeclaredButton role="button" onClick={handleClick} />',
+
+  // Gap C: declared role but NO injectRole → descriptive only. The role is
+  // known (control-needs-name etc. use it), but this rule injects nothing, even
+  // though the same shape with injectRole:true (DeclaredButton) would be fixed.
+  '<DescriptiveButton onClick={handleClick} />',
 
   // ---- Case 3: nested interactive element → SILENT on the outer element. ----
   // A generic element wrapping a real control is invalid nesting of

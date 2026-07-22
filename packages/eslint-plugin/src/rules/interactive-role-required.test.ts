@@ -33,9 +33,12 @@ describe('interactive-role-required', () => {
  * One component usage, tested twice. Without a matching componentSemantics
  * entry the engine has only a guess available and (for an unknown component)
  * deliberately stays SILENT — nothing is reported and nothing is ever
- * written. With the entry, the SAME code produces a declared-basis
- * diagnostic whose fix is genuinely auto-applied: config turned a guess into
- * ground truth and the emitted fix kind flipped with it.
+ * written. With the entry declaring `injectRole: true` (the opt-in that says
+ * this component renders a non-semantic element and needs the role), the SAME
+ * code produces a declared-basis diagnostic whose fix is genuinely
+ * auto-applied: config turned a guess into ground truth and the emitted fix
+ * kind flipped with it. (Without injectRole the role is purely descriptive and
+ * nothing is written — Gap C, docs/case-study-renge.md.)
  *
  * The inferred intrinsic path is the OTHER half: whatever it decides —
  * report-only for ambiguous content, or a confident role="button" suggestion
@@ -44,7 +47,9 @@ describe('interactive-role-required', () => {
  * path below writes anything. That contrast is the whole architecture.
  */
 describe('graduation contrast (config bridge, end to end)', () => {
-  const CONFIG = { componentSemantics: { DeclaredButton: { role: 'button' as const } } };
+  const CONFIG = {
+    componentSemantics: { DeclaredButton: { role: 'button' as const, injectRole: true } },
+  };
   const COMPONENT_USAGE = '<DeclaredButton onClick={handleClick} />';
 
   it('no matching config: nothing declared, nothing guessed, nothing written', () => {
@@ -54,7 +59,7 @@ describe('graduation contrast (config bridge, end to end)', () => {
     });
   });
 
-  it('matching config: the SAME usage becomes declared basis with a real, auto-applied fix', () => {
+  it('matching config with injectRole: the SAME usage becomes declared basis with a real, auto-applied fix', () => {
     tester.run('interactive-role-required', interactiveRoleRequired, {
       valid: [],
       invalid: [
@@ -65,6 +70,16 @@ describe('graduation contrast (config bridge, end to end)', () => {
           output: '<DeclaredButton role="button" onClick={handleClick} />',
         },
       ],
+    });
+  });
+
+  it('matching config WITHOUT injectRole: role is descriptive only — nothing reported, nothing written (Gap C)', () => {
+    const DESCRIPTIVE = {
+      componentSemantics: { DeclaredButton: { role: 'button' as const } },
+    };
+    tester.run('interactive-role-required', interactiveRoleRequired, {
+      valid: [{ code: COMPONENT_USAGE, options: [DESCRIPTIVE] }],
+      invalid: [],
     });
   });
 });
