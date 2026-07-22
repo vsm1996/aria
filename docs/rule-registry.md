@@ -36,13 +36,16 @@ Both Phase 5 validation bugs are now resolved.
 
 ## Distribution status (Phase 5) — PUBLISHED
 
-All eight rules ship in two surfaces from one rule set. As of 0.1.2 the two
-packages version independently (see CHANGELOG): **plugin `0.1.1`, CLI `0.1.2`**.
+All eight rules ship in two surfaces from one rule set. **Repo is at `0.2.0`
+(both packages), staged on `main` — publish pending; npm still serves `0.1.x`
+until then** (plugin `0.1.1`, CLI `0.1.2`). 0.2.0 carries the config-bridge
+behavior changes (Gaps A/B/C — see CHANGELOG). The two packages version
+independently but coincide at 0.2.0 for this shared change.
 
 - **[`eslint-plugin-aria-a11y`](https://www.npmjs.com/package/eslint-plugin-aria-a11y)**
-  `0.1.1` — the plugin (ESLint + oxlint via `jsPlugins`).
+  — the plugin (ESLint + oxlint via `jsPlugins`).
   `npm install --save-dev eslint eslint-plugin-aria-a11y`
-- **[`@aria-a11y/cli`](https://www.npmjs.com/package/@aria-a11y/cli)** `0.1.2` — the
+- **[`@aria-a11y/cli`](https://www.npmjs.com/package/@aria-a11y/cli)** — the
   zero-config standalone CLI, ESLint's `Linter` wrapped with a Babel→ESTree
   parser (Option B); output identical to the plugin (a parity test asserts it).
   `npx @aria-a11y/cli check src`
