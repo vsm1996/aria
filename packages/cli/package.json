@@ -1,6 +1,6 @@
 {
   "name": "@aria-a11y/cli",
-  "version": "0.1.2",
+  "version": "0.2.0",
   "description": "Zero-config standalone CLI for Aria's accessibility rules — aria check / aria fix, no ESLint config required.",
   "keywords": [
     "accessibility",

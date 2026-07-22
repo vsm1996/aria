@@ -3,14 +3,14 @@
 `eslint-plugin-aria-a11y` and `@aria-a11y/cli` shipped in lockstep through
 0.1.1. From 0.1.2 on they version independently — a fix that touches only one
 package bumps only that package (the rule engine is shared source, but the
-published artifacts are separate). Current: plugin `0.1.1`, CLI `0.1.2`.
+published artifacts are separate). Current: plugin `0.2.0`, CLI `0.2.0`.
 
-## Unreleased (on `main`, not yet published)
+## 0.2.0 — `eslint-plugin-aria-a11y` and `@aria-a11y/cli`
 
 Config-bridge improvements from the real design-system case study
-([docs/case-study-renge.md](./docs/case-study-renge.md)). These change
-diagnostic behavior — publish as a **plugin minor** (and republish the CLI,
-which runs the same rules).
+([docs/case-study-renge.md](./docs/case-study-renge.md)). The changes live in
+the plugin's rules and config; the CLI republishes at the same version because
+it runs the identical rules. **Minor**, for the behavior change below.
 
 ### ⚠️ BEHAVIOR CHANGE — role injection is now opt-in (`injectRole`)
 

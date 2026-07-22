@@ -1,6 +1,6 @@
 {
   "name": "eslint-plugin-aria-a11y",
-  "version": "0.1.1",
+  "version": "0.2.0",
   "description": "The accessibility formatter — meaning-preserving ARIA fixes that gate CI, plus lint-tier a11y checks. Runs in ESLint and oxlint.",
   "keywords": [
     "eslint",
