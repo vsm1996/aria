@@ -18,7 +18,9 @@
       "error",
       {
         "componentSemantics": {
-          "IconButton": { "role": "button", "nameProp": "label", "source": "declared" }
+          "IconButton": { "role": "button", "nameProp": "label", "source": "declared" },
+          "FancySelect": { "role": "combobox", "requiresName": true, "nameProp": "value", "source": "declared" },
+          "BareWidget": { "role": "combobox", "source": "declared" }
         }
       }
     ],

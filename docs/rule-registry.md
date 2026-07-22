@@ -501,6 +501,36 @@ dynamic → silent), plus the same ARIA/content checks on the usage. A `role:
 'img'` component, or one with no resolvable name prop, stays silent (not this
 rule's concern). Basis `declared`, report-only.
 
+**Two config-bridge gaps fixed after the Renge case study**
+([docs/case-study-renge.md](./case-study-renge.md)):
+
+- **Gap A — declared path no longer inherits the intrinsic path's
+  unknown-subtree conservatism.** An icon-only declared component whose child is
+  an unknown *component* (`<IconButton><CloseIcon/></IconButton>`) with no name
+  supplied used to be silenced (the opaque child folded to "cannot determine").
+  The declared path now treats an `unknown` subtree as "no name supplied here,"
+  not a blocker — so it flags. Known text content still names it, and a dynamic
+  `nameProp`/ARIA value still folds to `unknown` (that conservatism is about the
+  real name signal, and stays).
+- **Gap B — a name intent for a role no rule name-checks now emits a
+  notice, not silence.** A declaration with `requiresName: true` or a `nameProp`
+  whose `role` is outside the name-checkable set (e.g. a `<div>` combobox
+  declared `role: 'combobox'`) used to validate cleanly and do nothing — a
+  silent no-op that looked like it worked. It now emits a distinct,
+  once-per-component **tooling-scope notice** (`declaredRoleUnsupported`, basis
+  `declared`, report-only): "role 'X' is declared with a name requirement, but no
+  rule checks accessible names for role 'X' yet." `role: 'img'` is excluded
+  (img-needs-alt owns it); a bare `{ role }` with no name intent stays silent
+  (the role may still drive interactive-role-required's injection).
+
+**Gap C — proposed, not built.** The `role` field is read descriptively by this
+rule / img-needs-alt but prescriptively (as "inject this role") by
+interactive-role-required, so a native-rendering declared component
+(`IconButton → <button>`) gets a redundant `role="button"` injected. The
+proposed fix — make `role` descriptive and gate injection behind an opt-in
+`injectRole` flag — is written up in the case study; held for review (it touches
+every config consumer, same bar as the `nameProp` decision).
+
 ### `aria-hidden-not-focusable` — the third reason for native-basis / lint-tier
 
 Flags `aria-hidden="true"` on a focusable element, or on a subtree containing

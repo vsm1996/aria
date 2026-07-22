@@ -16,6 +16,10 @@ tests did not, and all three are worth fixing before more rules are built on the
 "declare it and it just works" assumption. **Partially validated, with a
 sharper picture of where the bridge's reach actually ends.**
 
+> **Status:** Gaps **A and B are resolved** (this PR) — see the real before/after
+> in each section. Gap **C is a schema decision, proposed but not built** (its
+> own section and PR).
+
 ---
 
 ## The components (real APIs, read from source)
@@ -90,46 +94,87 @@ real.**
 
 ## Result 2 — three gaps a real design system surfaced
 
-### Gap A — the dominant icon-button shape evades the name check
+> **Update:** Gaps A and B are now **RESOLVED** (with the real before/after
+> below). Gap C is a schema decision, proposed separately — see the end.
+
+### Gap A — the dominant icon-button shape evaded the name check · RESOLVED
 
 `control-needs-name` on `IconButton`, varying only the child (all **with** the
-config above):
+config), **before** the fix:
 
 ```
   <IconButton onClick={x} />                        -> FLAGGED (no name)
   <IconButton onClick={x}>Save</IconButton>         -> silent  (text is a name — correct)
   <IconButton onClick={x}><svg/></IconButton>       -> FLAGGED (svg is known-non-text)
-  <IconButton onClick={x}><CloseIcon/></IconButton> -> silent  (!)
+  <IconButton onClick={x}><CloseIcon/></IconButton> -> silent  (!)  <- the gap
   <IconButton aria-label="Close" …><CloseIcon/>…    -> silent  (named — correct)
 ```
 
-The fourth line is the finding. `<CloseIcon/>` is a **component**, so its
-rendered content is invisible from the call site; the rule conservatively treats
-an unknown-content child as "might supply a name" and stays silent. That is
-correct-by-its-own-rules, but it means the single most common icon-button shape —
-`<IconButton><SomeIconComponent/></IconButton>` — slips through the missing-name
-check. It works for a raw `<svg>` child and for a self-closing element, but real
-design systems ship icon **components**. So for icon buttons specifically, the
-config-bridge name check has limited reach. (`Checkbox`, which has no children,
-is unaffected — this is a shape-specific limit, not a bridge-wide one.)
+The fourth line was the finding: `<CloseIcon/>` is a **component**, so the rule
+conservatively treated its unknown content as "might supply a name" and stayed
+silent — letting the most common icon-button shape slip through.
 
-### Gap B — the custom `<div>` Select can't be name-checked at all
+**Root cause (not a special-case):** the *declared* path was folding in
+`subtreeText`, the intrinsic path's child-content signal, and inheriting its
+"unknown child → cannot determine → silent" conservatism. That conservatism is
+right for the intrinsic content path (where child text genuinely is the only
+name signal) but wrong for a declared component — the declaration already states
+the name comes from its `nameProp`/ARIA, so an opaque child is simply *"no name
+supplied here"*, not *"cannot determine."*
+
+**Fix:** in the declared path, an `unknown` subtree result no longer silences
+(known text still counts; a dynamic `nameProp`/ARIA value still folds to
+`unknown` — that conservatism is about the real name signal and stays). **After**:
 
 ```
-const C = () => <MultiSelect options={opts} onChange={onChange} />;
-  NO config: (silent)
-  + config : (silent)   // declared role: 'combobox'
+const C = () => <IconButton onClick={close}><CloseIcon /></IconButton>;   // no name
+  -> <IconButton> is declared as a control (componentSemantics) with no accessible
+     name: its "aria-label" prop is absent and there is no other name
+     (control-needs-name; WCAG 2.1 SC 4.1.2).                              FLAGGED
+
+const C = () => <IconButton aria-label="Close" onClick={close}><CloseIcon /></IconButton>;
+  -> (silent)                                                              correct
+```
+
+The icon-only declared component with no name is now caught; the same shape with
+a name is still correctly silent. Pinned by fixtures in both directions
+(`control-needs-name.fixtures.ts`).
+
+### Gap B — a declared role no rule name-checks failed silently · RESOLVED
+
+```
+const C = () => <MultiSelect options={opts} onChange={onChange} />;   // role: 'combobox', requiresName
+  BEFORE: (silent — config validated but did nothing)
 ```
 
 `MultiSelect` renders a `<div>` with no native role — arguably the component
-*most* in need of an enforced accessible name. But `control-needs-name`'s v1
-role scope is `button / link / textbox / searchbox / checkbox / radio`;
-`combobox` is outside it, so the rule silently ignores the declaration. The
-config **validates fine and has zero effect** — a silent no-op, with no warning
-that the declared role is unsupported. A team could reasonably believe their
-custom Select is covered when it isn't.
+*most* in need of an enforced name. But `control-needs-name`'s role scope is
+`button / link / textbox / searchbox / checkbox / radio`; `combobox` is outside
+it, so the declaration was a **silent no-op** — worse than an uncovered case,
+because it *looked* like it worked.
 
-### Gap C — the `role` field is overloaded, and the two consumers disagree
+**Fix:** when a declaration carries a name intent (`requiresName: true` or a
+`nameProp`) for a role no rule name-checks, `control-needs-name` now emits a
+distinct, once-per-component **tooling-scope notice** rather than silence.
+`role: 'img'` is excluded (img-needs-alt owns it); a bare `{ role }` with no
+name intent stays silent (the role may still drive `interactive-role-required`).
+**After**:
+
+```
+const C = () => <MultiSelect options={opts} onChange={onChange} />;
+  -> componentSemantics declares <MultiSelect> with role 'combobox' and a name
+     requirement, but no rule checks accessible names for role 'combobox' yet —
+     supported roles are button, link, textbox, searchbox, checkbox, radio
+     (control-needs-name), and img (img-needs-alt). The name requirement is NOT
+     enforced for 'combobox'; see docs/rule-registry.md. This is a tooling-scope
+     notice, not a problem with your code.
+```
+
+The config no longer lies by omission: a team is told, at the usage site, that
+their declared name requirement can't be honored for that role yet. Pinned by
+fixtures (name-intent role → notice; bare role → silent).
+
+### Gap C — the `role` field is overloaded, and the two consumers disagree · PROPOSED (not built)
 
 A single `role` declaration means two different things to two rules:
 
@@ -155,6 +200,69 @@ schema has no way to say "understand this role for name-checking, but don't
 inject it." A component that renders native semantics wants the former and not
 the latter; today one declaration forces both.
 
+#### Proposal (for review before building)
+
+**Make `role` purely descriptive, and make role *injection* an explicit,
+per-component opt-in.**
+
+Read the two consumers as they actually are: `control-needs-name` and
+`img-needs-alt` already use `role` **read-only** (to decide *whether* to
+name-check). Only `interactive-role-required`'s declared path is *prescriptive* —
+it inserts `role="X"` via an auto-fix, and it does so **unconditionally** for any
+declared role. That single prescriptive behavior is the whole of Gap C. The
+"check redundancy before injecting" idea can't be reused from `no-redundant-role`
+directly: that rule compares an explicit role against an *intrinsic element's*
+implicit role, and a component has no resolvable implicit role to compare
+against — so there is nothing for it to check. The missing information isn't
+computable; it has to be *declared*.
+
+**Concrete field-level change (additive, not schema-breaking):**
+
+```ts
+interface ComponentSemantic {
+  role: string;              // DESCRIPTIVE ONLY — "what this component is",
+                             //   read by any rule that needs the semantics.
+                             //   No longer implies a fix.
+  requiresName?: boolean;
+  nameProp?: string;
+  injectRole?: boolean;      // NEW, optional, default false. PRESCRIPTIVE —
+                             //   interactive-role-required inserts role="{role}"
+                             //   (declared-basis auto-fix) only when this is true.
+  source: 'declared';
+}
+```
+
+- **`interactive-role-required`**: inject only when `injectRole === true`. A
+  declared component without it is understood (its role informs other rules) but
+  never has a role stamped onto it.
+- **`validateAriaConfig`**: add `injectRole` to `SEMANTIC_KEYS`, typed boolean,
+  optional. Every existing config stays **valid** — nothing is removed or
+  retyped.
+- **Who sets `injectRole: true`?** Only a component that renders a *non-semantic*
+  element and genuinely needs the role at runtime (a `<div>`-based widget). A
+  component that renders a native control (`IconButton → <button>`) leaves it
+  off, and the redundant `role="button"` is never injected.
+
+**Semver / migration.** The schema change is additive (a new optional field), so
+no config becomes invalid — **not a schema-breaking change**. There *is* a
+behavior change: `interactive-role-required` stops auto-injecting for existing
+`{ role: … }` declarations that don't opt in. That is the safe direction —
+injecting a role onto a component that already renders native semantics was
+redundant in ~every real case (it *is* Gap C), so defaulting off fixes more than
+it changes. Ship as a 0.x **minor** with a CHANGELOG note; a design system that
+truly wants injection adds one boolean.
+
+**Alternative considered — a descriptive `renders` field** (e.g.
+`rendersNativeElement?: boolean`, or `renders?: 'button' | 'div' | …`) that lets
+`interactive-role-required` infer redundancy itself. It's more "truthful" and
+could serve future rules that need to know what a component renders, but it's
+heavier (every injectable component must describe its render) and still collapses
+to the same yes/no injection decision. `injectRole` is the minimal field that
+captures the actual choice; the `renders` descriptor is worth revisiting only if
+a second rule needs render information. **Recommend `injectRole`; hold for your
+call before building** (same standard as the `nameProp` decision — this touches
+every current and future config consumer).
+
 ---
 
 ## Does this validate "a token system hands Aria ground truth at scale"?
@@ -166,38 +274,33 @@ the latter; today one declaration forces both.
   with it. The `interactive-role-required` auto-fix graduation genuinely rewrites
   source from a config declaration. The plumbing works end to end on real
   components.
-- **But not "at scale, for free":** on a real, *good* design system the reach is
-  narrower than the synthetic tests implied. Icon buttons (the poster child) leak
-  through the unknown-component-child rule (Gap A); the custom widgets that most
-  need help sit outside the consuming rule's role scope and fail silently (Gap
-  B); and the one overloaded `role` field makes a single honest declaration do
-  the right thing for one rule and a redundant thing for another (Gap C).
+- **But not "at scale, for free":** on a real, *good* design system the reach was
+  narrower than the synthetic tests implied — and fixing that is the point.
+  Icon buttons (the poster child) leaked through the unknown-component-child rule
+  (Gap A, **now fixed**); the custom widgets that most need help failed silently
+  outside the consuming rule's role scope (Gap B, **now a notice**); and the one
+  overloaded `role` field still makes a single declaration do the right thing for
+  one rule and a redundant thing for another (Gap C, **proposed**).
 
-None are fatal. All are cheaper to fix now than after more rules assume
+None were fatal. All were cheaper to fix now than after more rules assume
 "declare the component and it just works."
 
-## Recommended follow-ups (for the registry's watch list)
+## Follow-ups
 
-1. **Separate "understand" from "inject" in the schema.** `interactive-role-required`
-   should only inject a role for components declared as rendering a *non-semantic*
-   element (or gate injection behind an explicit flag like `injectRole`/
-   `rendersNativeElement: false`). A component that renders a native control wants
-   its role understood, not stamped on.
-2. **Warn on a declared role no consumer supports** (Gap B). A `role: 'combobox'`
-   that silently does nothing is worse than an error — the config lies by
-   omission. Either expand `control-needs-name`'s role scope to the ARIA widget
-   roles (combobox, listbox, …) or have the loader/rule surface "declared role
-   'combobox' is not yet consumed."
-3. **Consider a `requiresName`-driven check that trusts the declaration over the
-   subtree** (Gap A). When a component is declared `requiresName: true` with a
-   `nameProp`, an unknown-content child arguably should *not* silence the check —
-   the design system has asserted the name must come from the prop, so an
-   unknown icon child shouldn't be assumed to provide it. This is a real judgment
-   call (it trades a possible false positive for catching the common case), which
-   is why it's flagged here rather than changed.
+- **Gap A — DONE (this PR).** The declared name check no longer inherits the
+  intrinsic path's unknown-subtree conservatism, so an icon-only declared
+  component with no name is caught.
+- **Gap B — DONE (this PR).** A name intent declared for a role no rule
+  name-checks now emits a tooling-scope notice instead of a silent no-op.
+- **Gap C — PROPOSED, not built.** Make `role` descriptive and gate role
+  injection behind an opt-in `injectRole` (see the proposal under Gap C).
+  Additive to the schema, a localized behavior change to
+  `interactive-role-required`. **Held for review before building**, same as the
+  `nameProp` decision — it touches every current and future config consumer.
 
 **Bottom line:** the config bridge is not vaporware — it moves real diagnostics
-on real components. But "a design system declares its components and the safe
-tier grows" is, today, true for the *simple* control shapes and leaky for the
-*custom* ones — which is exactly the population a design system exists to
-provide. Worth knowing now.
+on real components, and the two coverage gaps a real design system exposed are
+now closed. What remains (Gap C) is a one-field schema decision, not a
+correctness problem. "A design system declares its components and the safe tier
+grows" is now true for the simple control shapes *and* honest about the custom
+ones — it tells you when it can't help instead of failing silently.
