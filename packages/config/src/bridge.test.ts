@@ -98,6 +98,24 @@ describe('validateAriaConfig (pure)', () => {
     ).toThrow(/nameProp must be a non-empty string/);
   });
 
+  it('accepts injectRole as a valid boolean key and carries it through', () => {
+    const config = validateAriaConfig(
+      { componentSemantics: { A: { role: 'button', injectRole: true } } },
+      'x',
+    );
+    expect(config.componentSemantics?.['A']).toEqual({
+      role: 'button',
+      injectRole: true,
+      source: 'declared',
+    });
+  });
+
+  it('rejects a non-boolean injectRole (same strictness as requiresName)', () => {
+    expect(() =>
+      validateAriaConfig({ componentSemantics: { A: { role: 'button', injectRole: 'yes' } } }, 'x'),
+    ).toThrow(/injectRole must be a boolean/);
+  });
+
   it("normalizes an omitted source to 'declared' and rejects any other value", () => {
     const config = validateAriaConfig({ componentSemantics: { A: { role: 'link' } } }, 'x');
     expect(config.componentSemantics?.['A']).toEqual({ role: 'link', source: 'declared' });

@@ -5,6 +5,45 @@
 package bumps only that package (the rule engine is shared source, but the
 published artifacts are separate). Current: plugin `0.1.1`, CLI `0.1.2`.
 
+## Unreleased (on `main`, not yet published)
+
+Config-bridge improvements from the real design-system case study
+([docs/case-study-renge.md](./docs/case-study-renge.md)). These change
+diagnostic behavior — publish as a **plugin minor** (and republish the CLI,
+which runs the same rules).
+
+### ⚠️ BEHAVIOR CHANGE — role injection is now opt-in (`injectRole`)
+
+`componentSemantics` gains **`injectRole?: boolean` (default `false`)**.
+
+Previously, declaring a component's `role` caused `interactive-role-required` to
+**auto-inject** `role="…"` on any role-less usage of that component with a click
+handler. **That no longer happens by default.** `role` is now *descriptive* —
+every rule still reads it to understand the component — and injection happens
+**only when the component is declared `injectRole: true`**.
+
+**If you have a role-declared component that relied on that automatic injection,
+add `injectRole: true` to keep it.** Without it, `interactive-role-required` will
+no longer report or fix a missing role on that component. This is the one change
+here that can quietly alter what your CI does, so it is called out on its own.
+
+Why the default flipped: injecting a role onto a component that renders a native
+element (an icon button that renders `<button>`, say) produced a *redundant*
+`role="button"` — the very thing `no-redundant-role` removes, reached through the
+config path. Injection is only correct for a component that renders a
+non-semantic element and genuinely needs the role; that is now the opt-in case.
+
+### control-needs-name — two config-bridge coverage fixes (no opt-in needed)
+
+- **Gap A:** a declared control whose only child is an unknown icon *component*
+  (`<IconButton><CloseIcon/></IconButton>`) with no name supplied is now flagged
+  — it was silently skipped, because the declared path had inherited the
+  intrinsic path's "unknown child → can't tell → silent" conservatism.
+- **Gap B:** declaring a name requirement (`requiresName` / `nameProp`) for a
+  role no rule name-checks (e.g. a `<div>` combobox declared `role: 'combobox'`)
+  now emits a distinct tooling-scope notice (`declaredRoleUnsupported`) instead
+  of validating cleanly and doing nothing.
+
 ## @aria-a11y/cli 0.1.2
 
 CLI only. `eslint-plugin-aria-a11y` is unchanged and stays at `0.1.1`; the rule

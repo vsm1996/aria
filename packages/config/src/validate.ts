@@ -12,7 +12,7 @@ export class AriaConfigError extends Error {
 }
 
 const TOP_LEVEL_KEYS = new Set(['componentSemantics', 'ignore']);
-const SEMANTIC_KEYS = new Set(['role', 'requiresName', 'nameProp', 'source']);
+const SEMANTIC_KEYS = new Set(['role', 'injectRole', 'requiresName', 'nameProp', 'source']);
 
 function isPlainObject(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
@@ -70,6 +70,13 @@ export function validateAriaConfig(raw: unknown, source: string): AriaConfig {
           `componentSemantics.${component}.role must be a non-empty string`,
         );
       }
+      const injectRole = entry['injectRole'];
+      if (injectRole !== undefined && typeof injectRole !== 'boolean') {
+        throw new AriaConfigError(
+          source,
+          `componentSemantics.${component}.injectRole must be a boolean`,
+        );
+      }
       const requiresName = entry['requiresName'];
       if (requiresName !== undefined && typeof requiresName !== 'boolean') {
         throw new AriaConfigError(
@@ -95,6 +102,7 @@ export function validateAriaConfig(raw: unknown, source: string): AriaConfig {
       }
       validated[component] = {
         role,
+        ...(injectRole !== undefined ? { injectRole } : {}),
         ...(requiresName !== undefined ? { requiresName } : {}),
         ...(nameProp !== undefined ? { nameProp } : {}),
         source: 'declared',

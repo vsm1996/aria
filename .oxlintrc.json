@@ -40,7 +40,12 @@
     // (inferred suggestion vs. declared auto-fix) identically in both hosts.
     "aria-a11y/interactive-role-required": [
       "error",
-      { "componentSemantics": { "DeclaredButton": { "role": "button", "source": "declared" } } }
+      {
+        "componentSemantics": {
+          "DeclaredButton": { "role": "button", "injectRole": true, "source": "declared" },
+          "DescriptiveButton": { "role": "button", "source": "declared" }
+        }
+      }
     ],
     "aria-a11y/no-redundant-role": "error",
     "aria-a11y/no-unsupported-aria": "error"
