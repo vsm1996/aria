@@ -24,6 +24,12 @@ export const ruleOptions: unknown[] = [
   {
     componentSemantics: {
       IconButton: { role: 'button', nameProp: 'label', source: 'declared' },
+      // Gap B: a name intent (requiresName / nameProp) declared for a role no
+      // rule name-checks — a silent no-op before, now a scope notice.
+      FancySelect: { role: 'combobox', requiresName: true, nameProp: 'value', source: 'declared' },
+      // Gap B counter-case: a role declared with NO name intent stays silent
+      // (the role may still drive interactive-role-required; it is not inert).
+      BareWidget: { role: 'combobox', source: 'declared' },
     },
   },
 ];
@@ -71,8 +77,13 @@ export const valid: string[] = [
   // ---- Config bridge: declared control components. ----
   '<IconButton label="Close" />', // declared name prop present
   '<IconButton aria-label="Close" />', // named via ARIA on the usage
-  '<IconButton>Save</IconButton>', // named by child content
+  '<IconButton>Save</IconButton>', // named by KNOWN child text content
+  // Gap A: an unknown icon COMPONENT child does not silence — but a name is
+  // supplied here (aria-label), so it's correctly valid.
+  '<IconButton aria-label="Close"><CloseIcon /></IconButton>',
   '<UnknownThing />', // no config match → silent
+  // Gap B counter-case: a declared role with no name intent → no notice.
+  '<BareWidget />',
 ];
 
 export const invalid: InvalidFixture[] = [
@@ -111,6 +122,24 @@ export const invalid: InvalidFixture[] = [
     code: '<IconButton />',
     errors: [
       { messageId: 'componentControlNeedsName', data: { component: 'IconButton', prop: 'label' } },
+    ],
+    output: null,
+  },
+  // Gap A: an unknown icon COMPONENT child with NO name supplied is now flagged
+  // (was silenced by the intrinsic path's unknown-subtree conservatism).
+  {
+    code: '<IconButton><CloseIcon /></IconButton>',
+    errors: [
+      { messageId: 'componentControlNeedsName', data: { component: 'IconButton', prop: 'label' } },
+    ],
+    output: null,
+  },
+  // Gap B: a name intent declared for a role no rule name-checks → a
+  // tooling-scope notice (once), not silence and not a code problem.
+  {
+    code: '<FancySelect />',
+    errors: [
+      { messageId: 'declaredRoleUnsupported', data: { component: 'FancySelect', role: 'combobox' } },
     ],
     output: null,
   },

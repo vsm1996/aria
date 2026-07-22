@@ -154,6 +154,8 @@ export const controlNeedsName: Rule.RuleModule = {
         '<{{element}}> is an interactive control ({{role}}) with no accessible name, so assistive technology cannot announce it (control-needs-name; WCAG 2.1 SC 4.1.2). Add text content, aria-label, or an associated <label>. A placeholder is not a name. Aria cannot write it for you.',
       componentControlNeedsName:
         '<{{component}}> is declared as a control (componentSemantics) with no accessible name: its "{{prop}}" prop is absent and there is no other name (control-needs-name; WCAG 2.1 SC 4.1.2). Set {{prop}}, or add aria-label. Aria cannot write it for you.',
+      declaredRoleUnsupported:
+        "componentSemantics declares <{{component}}> with role '{{role}}' and a name requirement, but no rule checks accessible names for role '{{role}}' yet — supported roles are button, link, textbox, searchbox, checkbox, radio (control-needs-name), and img (img-needs-alt). The name requirement is NOT enforced for '{{role}}'; see docs/rule-registry.md. This is a tooling-scope notice, not a problem with your code.",
     },
     schema: [
       {
@@ -191,6 +193,9 @@ export const controlNeedsName: Rule.RuleModule = {
     }
     const intrinsics: PendingIntrinsic[] = [];
     const components: PendingComponent[] = [];
+    // Gap B: component names already given the "declared role is not
+    // name-checkable" notice, so it fires at most once per component per file.
+    const noticedUnsupported = new Set<string>();
 
     /** Walk ancestors for a literal `<label>` element wrapping this control. */
     function isInsideLabel(node: JSXOpeningElementNode): boolean {
@@ -272,8 +277,28 @@ export const controlNeedsName: Rule.RuleModule = {
         const semantic = resolveComponentSemantic(config, name);
         if (semantic === undefined) return;
         // Only control roles are this rule's concern; an image (img-needs-alt's
-        // job) or any non-control role stays silent here.
+        // job) or any non-control role is not name-checked here.
         if (!CONTENT_ROLES.has(semantic.role) && !FORM_CONTROL_INPUT_ROLES.has(semantic.role)) {
+          // Gap B: a declaration can express a name intent (requiresName: true,
+          // or a nameProp) for a role that NO rule name-checks — e.g. a custom
+          // <div> combobox declared { role: 'combobox', requiresName: true }.
+          // That validates cleanly and does nothing: a silent no-op that looks
+          // like it worked. Surface it as a tooling-scope notice (once per
+          // component per file). role: 'img' is excluded — img-needs-alt owns
+          // that name check, so it is not inert. A bare { role } with no name
+          // intent stays silent (the role may still drive interactive-role-
+          // required's injection; it is not inert either).
+          const hasNameIntent =
+            semantic.requiresName === true || resolveNameProp(semantic) !== undefined;
+          if (hasNameIntent && semantic.role !== 'img' && !noticedUnsupported.has(name)) {
+            noticedUnsupported.add(name);
+            emit(context, {
+              node: esNode,
+              messageId: 'declaredRoleUnsupported',
+              data: { component: name, role: semantic.role },
+              basis: 'declared',
+            });
+          }
           return;
         }
         const nameProp = resolveNameProp(semantic);
@@ -312,12 +337,24 @@ export const controlNeedsName: Rule.RuleModule = {
             propSignal = propState.value === null || propState.value.trim() !== '' ? 'named' : 'none';
           } else propSignal = 'none';
 
-          const parent = (control.raw as { parent?: { children?: JSXChildNode[] } }).parent;
+          // Declared path — Gap A (docs/case-study-renge.md). An UNKNOWN-content
+          // child (an icon COMPONENT like <CloseIcon/>, or a dynamic {expr})
+          // must NOT silence the check. The declaration already states how this
+          // component is named (its nameProp, or aria-*); an opaque child is
+          // simply "no name supplied here", not "cannot determine" — the
+          // intrinsic path's unknown-subtree conservatism was leaking in and
+          // silencing <IconButton><Icon/></IconButton> with no name present.
+          // Known text content still counts (it renders into the component), and
+          // a dynamic nameProp/aria value still folds to 'unknown' below (that
+          // conservatism is about the real name signal, and stays).
+          const subtree = subtreeText(
+            (control.raw as { parent?: { children?: JSXChildNode[] } }).parent?.children ?? [],
+          );
           const signal = fold([
             propSignal,
             ariaLabelSignal(control.raw, false),
             ariaLabelledbySignal(control.raw, false, definedIds, hasDynamicId),
-            subtreeText(parent?.children ?? []),
+            subtree === 'unknown' ? 'none' : subtree,
           ]);
           if (signal === 'none') {
             emit(context, {
