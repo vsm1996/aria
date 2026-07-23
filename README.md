@@ -46,9 +46,11 @@ Everything below is shipped, tested, and CI-gated — the
 [rule registry](./docs/rule-registry.md) is the source of truth, and nothing
 is marked shipped there that isn't.
 
-- **Both packages live on npm at `0.1.1`:**
+- **Both packages live on npm at `0.2.0`:**
   [`eslint-plugin-aria-a11y`](https://www.npmjs.com/package/eslint-plugin-aria-a11y)
-  and [`@aria-a11y/cli`](https://www.npmjs.com/package/@aria-a11y/cli).
+  and [`@aria-a11y/cli`](https://www.npmjs.com/package/@aria-a11y/cli). (See the
+  [CHANGELOG](./CHANGELOG.md) for the 0.2.0 config-bridge behavior change —
+  role injection is now opt-in via `injectRole`.)
 - **All 8 planned MVP rules shipped** — 3 format-tier, 5 lint-tier (below).
 - **CI is a required check with branch protection**: typecheck, the full test
   suite (including the tier-gate property tests), ESLint ↔ oxlint parity, and
@@ -168,10 +170,10 @@ implementation detail, not something you configure. It is "standalone" in the
 sense that matters — no ESLint config, no host — not a claim of zero ESLint
 code inside.
 
-> **Version note:** start at **0.1.1**. `0.1.0` exists in npm's history but was
-> broken for installers (a packaging bug — its manifest pointed at unshipped
-> `src`); it's fixed in 0.1.1 and guarded by a real install-and-import CI check.
-> See [CHANGELOG.md](./CHANGELOG.md).
+> **Version note:** latest is **0.2.0**; anything `0.1.1`+ is safe to install.
+> Avoid only `0.1.0` — it exists in npm's history but was broken for installers
+> (a packaging bug — its manifest pointed at unshipped `src`); fixed in 0.1.1 and
+> guarded by a real install-and-import CI check. See [CHANGELOG.md](./CHANGELOG.md).
 
 ### From source
 
